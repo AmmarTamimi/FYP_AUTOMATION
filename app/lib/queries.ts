@@ -1,0 +1,5 @@
+export const GET_ADMIN = `SELECT A.ADMINID AS id, A.USERNAME AS username FROM ADMIN A WHERE A.USERNAME = :username AND A.PASSWORD = :password`;
+
+export const GET_TEACHER = `SELECT T.TEACHERID AS id, T.EMAIL AS email, T.USERNAME AS username, T.NAME AS name, T.SPECIALIZATION AS specialization, T.QUALIFICATION AS qualification, T.EXPERIENCE AS experience, T.ROLE AS role, T.DEPTID AS deptId FROM TEACHERS T WHERE T.EMAIL = :email AND T.PASSWORD = :password`;
+
+export const GET_STUDENT_GROUP = `SELECT G.GROUPID AS groupId, G.JURYID AS juryId, G.GROUPUSERNAME AS username, G.LEADEREMAIL AS leaderEmail, G.PROJECTID AS projectId FROM STUDENTGROUP G WHERE G.GROUPUSERNAME = :username AND G.GROUPPASS = :password`;
