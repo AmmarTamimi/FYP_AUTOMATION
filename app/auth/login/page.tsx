@@ -16,55 +16,68 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [activeRole, setActiveRole] = useState<'student' | 'admin' | 'teacher'>('student');
 
-   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    
-    const role = activeRole === 'student' ? 'student' : 
-                  activeRole === 'admin' ? 'ADMIN' : 'teacher';
-    
-    // For teacher, we need a way to differentiate
-    // You might want to add a sub-role selector or auto-detect
-    
-    const formData = new FormData();
-    formData.append('email', identifier);
-    formData.append('pass', password);
-    formData.append('role', role);
+  // app/(auth)/login/page.tsx - Update handleSubmit function
 
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',  // ✅ Changed to POST
-            body: formData
-        });
+// app/(auth)/login/page.tsx - Updated handleSubmit
 
-        const data = await response.json();
-        
-        if (!response.ok) {
-            setError(data.message || "Login failed");
-            return;
-        }
-        
-        console.log("User logged in:", data.user);
-        
-        // Store user info in localStorage/session
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Redirect based on role
-        if (data.user.role === 'ADMIN') {
-            router.push('/admin/dashboard');
-        } else if (data.user.role === 'TEACHER') {
-            router.push('/teacher/dashboard');
-        } else if (data.user.role === 'STUDENT') {
-            router.push('/student/dashboard');
-        }
-        
-    } catch (error) {
-        console.error("Login error:", error);
-        setError("Something went wrong");
-    } finally {
-        setLoading(false);
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  
+  const role = activeRole === 'student' ? 'student' : 
+                activeRole === 'admin' ? 'ADMIN' : 'teacher';
+  
+  const formData = new FormData();
+  formData.append('email', identifier);
+  formData.append('pass', password);
+  formData.append('role', role);
+
+  try {
+    // 1. Call your custom API (where your SQL queries are)
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      setError(data.message || "Login failed");
+      return;
     }
+    
+    console.log("User logged in:", data.user);
+    
+    // 2. Create a NextAuth session (so dashboard pages work)
+    const signInResult = await signIn('credentials', {
+      identifier: data.user.email || data.user.name,
+      password: identifier, // temporary password to satisfy NextAuth
+      redirect: false,
+    });
+
+    if (signInResult?.error) {
+      console.warn("NextAuth session creation failed, but login succeeded");
+    }
+    
+    // 3. Store user info
+    localStorage.setItem('user', JSON.stringify(data.user));
+    
+    // 4. Redirect based on role
+    if (data.user.role === 'ADMIN') {
+      router.push('/admin/dashboard');
+    } else if (data.user.role === 'TEACHER') {
+      router.push('/teacher/dashboard');
+    } else if (data.user.role === 'STUDENT') {
+      router.push('/student/dashboard');
+    }
+    
+  } catch (error) {
+    console.error("Login error:", error);
+    setError("Something went wrong");
+  } finally {
+    setLoading(false);
+  }
 };
 
     return (
