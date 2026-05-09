@@ -16,7 +16,7 @@ function determineTeacherLevel(qualification: string, experience: number): 'seni
 
 export async function GET(req: NextRequest){
     try {
-       const teachers = await executeQuery('SELECT * FROM TEACHERS');
+       const teachers = await executeQuery('SELECT * FROM teachers');
        return NextResponse.json(teachers);
     } catch (error) {
         return NextResponse.json({message: 'Error in getting teachers'},{status: 500})
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
         // ✅ Check for duplicate teacher (by email or name)
         const existingTeacher = await executeQuery(
-            'SELECT TEACHERID, NAME, EMAIL FROM TEACHERS WHERE EMAIL = ? OR NAME = ?',
+            'SELECT TEACHERID, NAME, EMAIL FROM teachers WHERE EMAIL = ? OR NAME = ?',
             [email, name]
         );
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
         // ✅ Fetch department ID
         const dept = await executeQuery(
-            'SELECT DEPTID FROM DEPARTMENTS WHERE NAME = ?',
+            'SELECT DEPTID FROM departments WHERE NAME = ?',
             [department]
         );
 
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
         // ✅ Add teacher with auto-determined role
         const result = await executeQuery(
-            `INSERT INTO TEACHERS 
+            `INSERT INTO teachers 
              (EMAIL, USERNAME, NAME, PASSWORD, SPECIALIZATION, QUALIFICATION, EXPERIENCE, ROLE, DEPTID) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [email, email, name, password, specialization, qualification, experienceNum, autoRole, deptId]

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest){
         
         // Check if group exists and is pending
         const checkGroup = await executeQuery(
-            'SELECT GROUPID, STATUS FROM STUDENTGROUP WHERE GROUPID = ?',
+            'SELECT GROUPID, STATUS FROM studentgroup WHERE GROUPID = ?',
             [groupId]
         );
         
@@ -40,13 +40,13 @@ export async function POST(req: NextRequest){
         
         // Update group to VERIFIED with password
         await executeQuery(
-            'UPDATE STUDENTGROUP SET STATUS = "VERIFIED", GROUPPASS = ? WHERE GROUPID = ?',
+            'UPDATE studentgroup SET STATUS = "VERIFIED", GROUPPASS = ? WHERE GROUPID = ?',
             [password, groupId]
         );
         
         // Optional: Get group details to send email
         const groupDetails = await executeQuery(
-            'SELECT GROUPUSERNAME, LEADEREMAIL FROM STUDENTGROUP WHERE GROUPID = ?',
+            'SELECT GROUPUSERNAME, LEADEREMAIL FROM studentgroup WHERE GROUPID = ?',
             [groupId]
         );
         

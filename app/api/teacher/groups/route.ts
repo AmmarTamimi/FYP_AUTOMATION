@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     
     // Get the jury IDs where teacher is senior or junior
     const juryRes = await executeQuery(
-      'SELECT JURYID FROM JURY WHERE SENIORID = ? OR JUNIORID = ?',
+      'SELECT JURYID FROM jury WHERE SENIORID = ? OR JUNIORID = ?',
       [teacherId, teacherId]
     );
     
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     // Get groups for those juries
     const placeholders = juryIds.map(() => '?').join(',');
     const studentGroups = await executeQuery(
-      `SELECT * FROM STUDENTGROUP WHERE JURYID IN (${placeholders})`,
+      `SELECT * FROM studentgroup WHERE JURYID IN (${placeholders})`,
       juryIds
     );
     

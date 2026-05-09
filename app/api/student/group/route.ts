@@ -8,7 +8,7 @@ export async function GET(req:NextRequest){
         if(!name){
             return NextResponse.json({message: 'group username not provided'},{status:500});
         }
-        const groupDetails = await executeQuery('SELECT * FROM STUDENTGROUP WHERE GROUPUSERNAME = ?',[name]);
+        const groupDetails = await executeQuery('SELECT * FROM studentgroup WHERE GROUPUSERNAME = ?',[name]);
         return NextResponse.json(groupDetails);
     } catch (error) {
         return NextResponse.json({message: 'Error in fetching group details',error},{status: 500});

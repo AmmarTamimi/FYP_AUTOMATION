@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     }
     
     const teacherDetails = await executeQuery(
-      'SELECT * FROM TEACHERS WHERE EMAIL = ?',
+      'SELECT * FROM teachers WHERE EMAIL = ?',
       [email],
     );
     

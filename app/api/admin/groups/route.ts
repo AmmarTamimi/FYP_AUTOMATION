@@ -9,10 +9,10 @@ export async function GET(req: NextRequest){
             return NextResponse.json({message: 'Status not provides'},{status: 500})
         }
         if(status === 'PENDING'){
-            const groupResult = await executeQuery('SELECT * FROM STUDENTGROUP WHERE STATUS = ? ORDER BY GROUPID DESC',[status]);
+            const groupResult = await executeQuery('SELECT * FROM studentgroup WHERE STATUS = ? ORDER BY GROUPID DESC',[status]);
             return NextResponse.json(groupResult);
         }else if (status === 'VERIFIED'){
-            const groupResult = await executeQuery('SELECT * FROM STUDENTGROUP WHERE STATUS = ? ORDER BY GROUPID DESC',[status]);
+            const groupResult = await executeQuery('SELECT * FROM studentgroup WHERE STATUS = ? ORDER BY GROUPID DESC',[status]);
             return NextResponse.json(groupResult);
         }
     } catch (error) {

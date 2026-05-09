@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Check if group already exists
-    const query = `SELECT GROUPID FROM STUDENTGROUP WHERE GROUPUSERNAME = ?`;
+    const query = `SELECT GROUPID FROM studentgroup WHERE GROUPUSERNAME = ?`;
     const group = await executeQuery(query, [groupUsername]);
 
     if (Array.isArray(group) && group.length > 0) {
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Leader should not be in multiple groups
-    const leaderQuery = `SELECT GROUPID FROM STUDENTGROUP WHERE LEADEREMAIL = ?`;
+    const leaderQuery = `SELECT GROUPID FROM studentgroup WHERE LEADEREMAIL = ?`;
     const leader = await executeQuery(leaderQuery, [leaderEmail]);
 
     if (Array.isArray(leader) && leader.length > 0) {
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Insert group as pending
-    const insertQuery = `INSERT INTO STUDENTGROUP (groupusername, leaderemail, supervisorEmail, status) VALUES (?, ?, ?, 'PENDING')`;
+    const insertQuery = `INSERT INTO studentgroup (groupusername, leaderemail, supervisorEmail, status) VALUES (?, ?, ?, 'PENDING')`;
     const response = await executeQuery(insertQuery, [
       groupUsername,
       leaderEmail,
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     // 4. Add members into students table
     console.log("Looking for department name:", deptName);
     const deptResult = await executeQuery(
-      "SELECT DEPTID FROM DEPARTMENTS WHERE NAME = ?",
+      "SELECT DEPTID FROM departments WHERE NAME = ?",
       [deptName],
     );
 
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         memberBatch = 2000 + year;
       }
 
-      const addMemQuery = `INSERT INTO STUDENTS (GROUPID, EMAIL, NAME, SECTION, BATCH, DEPTID) 
+      const addMemQuery = `INSERT INTO students (GROUPID, EMAIL, NAME, SECTION, BATCH, DEPTID) 
                            VALUES (?, ?, ?, ?, ?, ?)`;
 
       await executeQuery(addMemQuery, [
@@ -149,14 +149,14 @@ export async function POST(req: NextRequest) {
     // 6. Insert project details - ONE ROW PER DOMAIN (same PROJECTID for all domains)
     // First, get the next PROJECTID
     const nextIdResult = await executeQuery(
-      "SELECT IFNULL(MAX(PROJECTID), 0) + 1 as nextId FROM PROJECT"
+      "SELECT IFNULL(MAX(PROJECTID), 0) + 1 as nextId FROM project"
     );
     const newProjectId = (nextIdResult as any[])[0]?.nextId;
 
     // Insert one row for each domain
     for (const domainName of domains) {
       const projectQuery = `
-        INSERT INTO PROJECT (PROJECTID, DOMAIN, GROUPID, PROPOSALDOCUMENT, PROJECTTITLE) 
+        INSERT INTO project (PROJECTID, DOMAIN, GROUPID, PROPOSALDOCUMENT, PROJECTTITLE) 
         VALUES (?, ?, ?, ?, ?)
       `;
       await executeQuery(projectQuery, [

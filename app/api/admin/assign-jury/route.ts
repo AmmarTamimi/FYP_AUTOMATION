@@ -6,18 +6,18 @@ export async function POST(req: NextRequest) {
     try {
         const { groupId } = await req.json();
         
-        console.log(`=== Assigning Jury for Group ID: ${groupId} ===`);
+        console.log(`=== Assigning jury for Group ID: ${groupId} ===`);
         
         // Step 1: Get project domains for this group
         console.log("Step 1: Getting project domains...");
         const projectDomains = await executeQuery(
             `SELECT DISTINCT p.DOMAIN 
-             FROM PROJECT p
+             FROM project p
              WHERE p.GROUPID = ?`,
             [groupId]
         );
         
-        console.log("Project domains query result:", projectDomains);
+        console.log("project domains query result:", projectDomains);
         
         const domains = (projectDomains as any[]).map(d => d.DOMAIN);
         
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
             );
         }
         
-        console.log("Project domains:", domains);
+        console.log("project domains:", domains);
         
         // Step 2: Find all available teachers
         console.log("Step 2: Finding available teachers...");
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
                     t.EXPERIENCE,
                     t.ROLE,
                     0 as CURRENT_LOAD
-                 FROM TEACHERS t
+                 FROM teachers t
                  WHERE t.SPECIALIZATION LIKE CONCAT('%', ?, '%')`,
                 [domain]
             );
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
             if (!teacherMap.has(teacher.TEACHERID)) {
                 // Calculate teacher's current load
                 const loadResult = await executeQuery(
-                    `SELECT COUNT(*) as total FROM JURY 
+                    `SELECT COUNT(*) as total FROM jury 
                      WHERE SENIORID = ? OR JUNIORID = ?`,
                     [teacher.TEACHERID, teacher.TEACHERID]
                 );
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         console.log("Step 6: Finding or creating jury...");
         let jury = await executeQuery(
             `SELECT JURYID, NUMOFPROJECTSASSIGNED
-             FROM JURY 
+             FROM jury 
              WHERE SENIORID = ? AND JUNIORID = ? AND NUMOFPROJECTSASSIGNED < 10`,
             [seniorTeacher.TEACHERID, juniorTeacher.TEACHERID]
         );
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
         if ((jury as any[]).length === 0) {
             console.log("Creating new jury...");
             const newJury = await executeQuery(
-                `INSERT INTO JURY (SENIORID, JUNIORID, NUMOFPROJECTSASSIGNED) 
+                `INSERT INTO jury (SENIORID, JUNIORID, NUMOFPROJECTSASSIGNED) 
                  VALUES (?, ?, 0)`,
                 [seniorTeacher.TEACHERID, juniorTeacher.TEACHERID]
             );
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
         // Step 7: Update jury's project count
         console.log("Step 7: Updating jury project count...");
         await executeQuery(
-            `UPDATE JURY SET NUMOFPROJECTSASSIGNED = NUMOFPROJECTSASSIGNED + 1 
+            `UPDATE jury SET NUMOFPROJECTSASSIGNED = NUMOFPROJECTSASSIGNED + 1 
              WHERE JURYID = ? AND NUMOFPROJECTSASSIGNED < 10`,
             [juryId]
         );
@@ -170,15 +170,15 @@ export async function POST(req: NextRequest) {
         // Step 8: Update student group with jury ID
         console.log("Step 8: Updating student group with jury ID...");
         await executeQuery(
-            `UPDATE STUDENTGROUP SET JURYID = ? WHERE GROUPID = ?`,
+            `UPDATE studentgroup SET JURYID = ? WHERE GROUPID = ?`,
             [juryId, groupId]
         );
         
-        console.log("Jury assignment completed successfully!");
+        console.log("jury assignment completed successfully!");
         
         return NextResponse.json({
             success: true,
-            message: "Jury assigned successfully",
+            message: "jury assigned successfully",
             data: {
                 juryId: juryId,
                 seniorTeacher: seniorTeacher.NAME,
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
         });
         
     } catch (error) {
-        console.error("Jury assignment error DETAILS:", error);
+        console.error("jury assignment error DETAILS:", error);
         return NextResponse.json(
             { message: "Error assigning jury", error: String(error) },
             { status: 500 }

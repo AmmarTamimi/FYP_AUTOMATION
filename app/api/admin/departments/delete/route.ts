@@ -5,7 +5,7 @@ export async function POST(req: NextRequest){
     try {
         const body = await req.json();
         const deptId = body.deptId;
-        const response = await executeQuery('DELETE FROM DEPARTMENTS WHERE DEPTID = ?',[deptId]);
+        const response = await executeQuery('DELETE FROM departments WHERE DEPTID = ?',[deptId]);
         return NextResponse.json({
             success: true,
             message: 'department deleted!'

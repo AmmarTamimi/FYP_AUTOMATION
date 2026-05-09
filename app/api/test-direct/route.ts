@@ -7,7 +7,7 @@ export async function GET() {
     const test = await executeQuery("SELECT 1 as test");
     
     // Test admin table
-    const admins = await executeQuery("SELECT USERNAME FROM ADMIN");
+    const admins = await executeQuery("SELECT USERNAME FROM admin");
     
     return NextResponse.json({
       success: true,

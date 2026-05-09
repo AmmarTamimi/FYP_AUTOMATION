@@ -8,7 +8,7 @@ export async function GET(req:NextRequest){
         if(!groupId){
             return NextResponse.json({message: 'Group ID not provided'},{status:500});
         }
-        const memberDetails = await executeQuery('SELECT * FROM STUDENTS WHERE GROUPID = ?',[groupId]);
+        const memberDetails = await executeQuery('SELECT * FROM students WHERE GROUPID = ?',[groupId]);
         return NextResponse.json(memberDetails);
     } catch (error) {
         return NextResponse.json({message: 'Error in fetching group members details',error},{status: 500});

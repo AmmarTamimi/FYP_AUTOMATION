@@ -12,9 +12,9 @@ export async function POST(req: NextRequest) {
         console.log("Login attempt:", { email, role });
 
         // ============================================
-        // ADMIN LOGIN - Use lowercase 'admin'
+        // admin LOGIN - Use lowercase 'admin'
         // ============================================
-        if (role === 'ADMIN') {
+        if (role === 'admin') {
             const adminResult = await executeQuery(
                 'SELECT AdminId as id, username as name, password FROM admin WHERE username = ?',
                 [email]
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
             
             if ((adminResult as any[]).length === 0) {
                 return NextResponse.json(
-                    { message: 'Admin not found' },
+                    { message: 'admin not found' },
                     { status: 401 }
                 );
             }
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
                 user: {
                     id: admin.id,
                     name: admin.name,
-                    role: 'ADMIN'
+                    role: 'admin'
                 }
             });
         }
