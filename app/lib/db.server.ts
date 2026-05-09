@@ -1,35 +1,33 @@
-// lib/db.js
+// lib/db.server.ts
 import mysql from 'mysql2/promise';
 
-// Create the connection pool
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER|| 'root',       // Your MySQL user
-    password: '', // Your MySQL password
-    database: process.env.DB_DBNAME || 'fyp_project', // You will create this
-    waitForConnections: true,
-    connectionLimit: 10,
-});
+let globalPool: mysql.Pool | null = null;
 
-//helper to run queries
-
-export async function executeQuery(query:string, params: any = []){
-  try {
-    const [rows] = await pool.execute(query,params);
-    return rows;
-  } catch (error) {
-    console.log("Query execution error: ",error);
-    throw error;
+function getPool() {
+  if (!globalPool) {
+    globalPool = mysql.createPool({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      port: Number(process.env.DB_PORT) || 3306,
+      waitForConnections: true,
+      connectionLimit: 10,
+      ssl: {
+        rejectUnauthorized: true  // Required for Aiven
+      }
+    });
   }
+  return globalPool;
 }
 
-export async function testConnection() {
-    try {
-        const result = await executeQuery('SELECT 1 as connected');
-        console.log('✅ MySQL Connected Successfully');
-        return true;
-    } catch (error) {
-        console.error('❌ MySQL Connection Failed:', error);
-        return false;
-    }
+export async function executeQuery<T = any>(query: string, params: any[] = []): Promise<T[]> {
+  const pool = getPool();
+  try {
+    const [rows] = await pool.execute(query, params);
+    return rows as T[];
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw error;
+  }
 }
