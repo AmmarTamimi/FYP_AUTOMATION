@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         // ============================================
         // TEACHER LOGIN - Use lowercase 'teachers'
         // ============================================
-        if (role === 'TEACHER') {
+        if (role === 'teacher') {
             const teacherResult = await executeQuery(
                 'SELECT TeacherId as id, name, email, password FROM teachers WHERE email = ?',
                 [email]
