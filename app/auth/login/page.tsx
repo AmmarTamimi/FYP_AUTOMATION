@@ -25,16 +25,16 @@ const handleSubmit = async (e: React.FormEvent) => {
   setLoading(true);
   setError("");
   
-  const role = activeRole === 'student' ? 'student' : 
-                activeRole === 'admin' ? 'ADMIN' : 'teacher';
+  // Use UPPERCASE consistently
+  const role = activeRole === 'student' ? 'STUDENT' : 
+                activeRole === 'admin' ? 'ADMIN' : 'TEACHER';
   
   const formData = new FormData();
   formData.append('email', identifier);
   formData.append('pass', password);
-  formData.append('role', role);
+  formData.append('role', role);  // Now sends 'ADMIN', 'TEACHER', or 'STUDENT'
 
   try {
-    // 1. Call your custom API (where your SQL queries are)
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       body: formData
@@ -49,21 +49,17 @@ const handleSubmit = async (e: React.FormEvent) => {
     
     console.log("User logged in:", data.user);
     
-    // 2. Create a NextAuth session (so dashboard pages work)
-    const signInResult = await signIn('credentials', {
+    // Create NextAuth session with consistent role
+    await signIn('credentials', {
       identifier: data.user.email || data.user.name,
-      password: identifier, // temporary password to satisfy NextAuth
+      password: password,
+      role: role,  // Same uppercase role
       redirect: false,
     });
-
-    if (signInResult?.error) {
-      console.warn("NextAuth session creation failed, but login succeeded");
-    }
     
-    // 3. Store user info
     localStorage.setItem('user', JSON.stringify(data.user));
     
-    // 4. Redirect based on role
+    // Redirect based on role
     if (data.user.role === 'ADMIN') {
       router.push('/admin/dashboard');
     } else if (data.user.role === 'TEACHER') {

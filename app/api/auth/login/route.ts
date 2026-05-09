@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
                 user: {
                     id: admin.id,
                     name: admin.name,
-                    role: 'admin'
+                    role: 'ADMIN'
                 }
             });
         }

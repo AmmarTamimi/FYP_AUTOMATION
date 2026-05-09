@@ -12,83 +12,77 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" },
         role: { label: "Role", type: "text" },
       },
-      async authorize(credentials) {
-        if (!credentials?.identifier || !credentials?.password) {
-          return null;
-        }
+     async authorize(credentials) {
+  if (!credentials?.identifier || !credentials?.password) {
+    return null;
+  }
 
-        const role = credentials.role;
-        const email = credentials.identifier;
-        const password = credentials.password;
+  const role = credentials.role; // Will be 'ADMIN', 'TEACHER', or 'STUDENT'
+  const email = credentials.identifier;
+  const password = credentials.password;
 
-        // ============================================
-        // ADMIN LOGIN
-        // ============================================
-        if (role === 'ADMIN') {
-          const adminResult = await executeQuery(
-            'SELECT ADMINID as id, USERNAME as name, PASSWORD FROM ADMIN WHERE USERNAME = ?',
-            [email]
-          );
-          
-          if ((adminResult as any[]).length > 0) {
-            const admin = (adminResult as any[])[0];
-            if (admin.PASSWORD === password) {
-              return {
-                id: admin.id,
-                name: admin.name,
-                email: email,
-                role: 'ADMIN',
-              };
-            }
-          }
-        }
-        
-        // ============================================
-        // TEACHER LOGIN
-        // ============================================
-        if (role === 'TEACHER') {
-          const teacherResult = await executeQuery(
-            'SELECT TEACHERID as id, NAME as name, EMAIL, PASSWORD FROM TEACHERS WHERE EMAIL = ?',
-            [email]
-          );
-          
-          if ((teacherResult as any[]).length > 0) {
-            const teacher = (teacherResult as any[])[0];
-            if (teacher.PASSWORD === password) {
-              return {
-                id: teacher.id,
-                name: teacher.name,
-                email: teacher.EMAIL,
-                role: 'TEACHER',
-              };
-            }
-          }
-        }
-        
-        // ============================================
-        // STUDENT GROUP LOGIN
-        // ============================================
-        if (role === 'student') {
-          const groupResult = await executeQuery(
-            'SELECT GROUPID as id, GROUPUSERNAME as name, GROUPPASS as password FROM STUDENTGROUP WHERE GROUPUSERNAME = ?',
-            [email]
-          );
-          
-          if ((groupResult as any[]).length > 0) {
-            const group = (groupResult as any[])[0];
-            if (group.password === password) {
-              return {
-                id: group.id,
-                name: group.name,
-                email: email,
-                role: 'STUDENT',
-              };
-            }
-          }
-        }
+  // ADMIN LOGIN
+  if (role === 'ADMIN') {
+    const adminResult = await executeQuery(
+      'SELECT AdminId as id, username as name, password FROM admin WHERE username = ?',
+      [email]
+    );
+    
+    if ((adminResult as any[]).length > 0) {
+      const admin = (adminResult as any[])[0];
+      if (admin.password === password) {
+        return {
+          id: admin.id,
+          name: admin.name,
+          email: email,
+          role: 'ADMIN',
+        };
+      }
+    }
+  }
+  
+  // TEACHER LOGIN
+  if (role === 'TEACHER') {
+    const teacherResult = await executeQuery(
+      'SELECT TeacherId as id, name, email, password FROM teachers WHERE email = ?',
+      [email]
+    );
+    
+    if ((teacherResult as any[]).length > 0) {
+      const teacher = (teacherResult as any[])[0];
+      if (teacher.password === password) {
+        return {
+          id: teacher.id,
+          name: teacher.name,
+          email: teacher.email,
+          role: 'TEACHER',
+        };
+      }
+    }
+  }
+  
+  // STUDENT LOGIN
+  if (role === 'STUDENT') {
+    const groupResult = await executeQuery(
+      'SELECT groupId as id, groupUsername as name, groupPass as password FROM studentgroup WHERE groupUsername = ?',
+      [email]
+    );
+    
+    if ((groupResult as any[]).length > 0) {
+      const group = (groupResult as any[])[0];
+      if (group.password === password) {
+        return {
+          id: group.id,
+          name: group.name,
+          email: email,
+          role: 'STUDENT',
+        };
+      }
+    }
+  }
 
-        return null;
-      },
+  return null;
+}
     }),
   ],
   callbacks: {
