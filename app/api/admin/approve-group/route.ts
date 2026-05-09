@@ -1,70 +1,41 @@
 import { NextResponse, NextRequest } from "next/server";
 import { executeQuery } from "@/app/lib/db.server";
 
-export async function POST(req: NextRequest){
+// app/api/admin/approve-group/route.ts - Add more logging
+export async function POST(req: NextRequest) {
     try {
-        // Extract body
         const body = await req.json();
-        
-        // Validate required fields
-        if (!body.groupId || !body.password) {
-            return NextResponse.json(
-                { message: 'Missing required fields: groupId and password' },
-                { status: 400 }
-            );
-        }
-        
         const groupId = body.groupId;
         const password = body.password;
         
-        // Check if group exists and is pending
+        console.log("=== APPROVE GROUP DEBUG ===");
+        console.log("Group ID:", groupId);
+        console.log("Password:", password);
+        
+        // Check if group exists
         const checkGroup = await executeQuery(
-            'SELECT GROUPID, STATUS FROM studentgroup WHERE GROUPID = ?',
+            'SELECT groupId, status FROM studentgroup WHERE groupId = ?',
             [groupId]
         );
         
-        if ((checkGroup as any[]).length === 0) {
-            return NextResponse.json(
-                { message: 'Group not found' },
-                { status: 404 }
+        console.log("Check result:", JSON.stringify(checkGroup, null, 2));
+        
+        // If group exists, try to update
+        if ((checkGroup as any[]).length > 0) {
+            console.log("Attempting UPDATE...");
+            const updateResult = await executeQuery(
+                'UPDATE studentgroup SET status = "VERIFIED", groupPass = ? WHERE groupId = ?',
+                [password, groupId]
             );
+            console.log("Update result:", updateResult);
         }
         
-        const groupStatus = (checkGroup as any[])[0]?.STATUS;
-        if (groupStatus !== 'PENDING') {
-            return NextResponse.json(
-                { message: `Group is already ${groupStatus}. Cannot approve again.` },
-                { status: 400 }
-            );
-        }
-        
-        // Update group to VERIFIED with password
-        await executeQuery(
-            'UPDATE studentgroup SET STATUS = "VERIFIED", GROUPPASS = ? WHERE GROUPID = ?',
-            [password, groupId]
-        );
-        
-        // Optional: Get group details to send email
-        const groupDetails = await executeQuery(
-            'SELECT GROUPUSERNAME, LEADEREMAIL FROM studentgroup WHERE GROUPID = ?',
-            [groupId]
-        );
-        
-        const leaderEmail = (groupDetails as any[])[0]?.LEADEREMAIL;
-        
-        // Here you would send email to leader with credentials
-        // await sendEmail(leaderEmail, groupUsername, password);
-        
-        return NextResponse.json({ 
-            success: true, 
-            message: 'Group approved successfully',
-            leaderEmail: leaderEmail
-        });
+        return NextResponse.json({ success: true });
         
     } catch (error) {
-        console.error('Error approving group:', error);
+        console.error("ERROR DETAILS:", error);
         return NextResponse.json(
-            { message: 'Error in approving group' },
+            { message: (error as Error).message, stack: (error as Error).stack },
             { status: 500 }
         );
     }
