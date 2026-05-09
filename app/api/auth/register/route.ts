@@ -1,3 +1,4 @@
+import cloudinary from "@/app/lib/cloudinary";
 import { executeQuery } from "@/app/lib/db.server";
 import { mkdir, writeFile } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     const leaderEmail = formData.get("leaderEmail") as string;
     const membersJson = formData.get("members") as string;
     const deptName = formData.get("deptName") as string;
-    const domainJson = formData.get("domain") as string;  // JSON array of domains
+    const domainJson = formData.get("domain") as string; // JSON array of domains
     const document = formData.get("document") as File;
     const projectTitle = formData.get("projectTitle") as string;
     const supervisorEmail = formData.get("supervisorEmail") as string;
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     // Parse members and domains
     const members = JSON.parse(membersJson);
-    const domains = JSON.parse(domainJson);  // Array of domain strings
+    const domains = JSON.parse(domainJson); // Array of domain strings
 
     if (!members || members.length < 2) {
       return NextResponse.json(
@@ -128,48 +129,54 @@ export async function POST(req: NextRequest) {
       ]);
     }
 
-    // 5. Save proposal document
-    let documentPath = null;
+    // 5. Save proposal document - Upload to Cloudinary
+    let documentUrl = null;
+
     if (document) {
-      const uploadDir = path.join(
-        process.cwd(),
-        "public",
-        "uploads",
-        "proposals",
-      );
-      await mkdir(uploadDir, { recursive: true });
-      const timestamp = Date.now();
-      const filename = `${groupUsername}_${timestamp}_${document.name}`;
-      const buffer = Buffer.from(await document.arrayBuffer());
-      const filePath = path.join(uploadDir, filename);
-      await writeFile(filePath, buffer);
-      documentPath = `/uploads/proposals/${filename}`;
+      try {
+        // Convert file to base64
+        const buffer = Buffer.from(await document.arrayBuffer());
+        const base64String = buffer.toString("base64");
+        const dataUri = `data:${document.type};base64,${base64String}`;
+
+        // Upload to Cloudinary
+        const result = await cloudinary.uploader.upload(dataUri, {
+          folder: "fyp_proposals",
+          resource_type: "auto",
+          public_id: `${groupUsername}_${Date.now()}_${document.name.replace(/\s/g, "_")}`,
+        });
+
+        documentUrl = result.secure_url;
+        console.log("File uploaded to Cloudinary:", documentUrl);
+      } catch (uploadError) {
+        console.error("Cloudinary upload error:", uploadError);
+      }
     }
 
-    // 6. Insert project details - ONE ROW PER DOMAIN (same PROJECTID for all domains)
-    // First, get the next PROJECTID
+    // 6. Generate new Project ID FIRST (before the loop)
     const nextIdResult = await executeQuery(
-      "SELECT IFNULL(MAX(PROJECTID), 0) + 1 as nextId FROM project"
+      "SELECT IFNULL(MAX(PROJECTID), 0) + 1 as nextId FROM project",
     );
     const newProjectId = (nextIdResult as any[])[0]?.nextId;
 
-    // Insert one row for each domain
+    // 7. Insert project details - ONE ROW PER DOMAIN
     for (const domainName of domains) {
       const projectQuery = `
         INSERT INTO project (PROJECTID, DOMAIN, GROUPID, PROPOSALDOCUMENT, PROJECTTITLE) 
         VALUES (?, ?, ?, ?, ?)
-      `;
+    `;
       await executeQuery(projectQuery, [
-        newProjectId,
-        domainName.trim(),        // Each domain gets its own row
+        newProjectId, // Now newProjectId is defined ✅
+        domainName.trim(),
         newGroupId,
-        documentPath,
+        documentUrl,
         projectTitle,
       ]);
     }
 
-    console.log(`Inserted ${domains.length} project rows for ProjectID: ${newProjectId}`);
-
+    console.log(
+      `Inserted ${domains.length} project rows for ProjectID: ${newProjectId}`,
+    );
     // ✅ Send success response
     return NextResponse.json(
       {
