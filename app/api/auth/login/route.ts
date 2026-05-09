@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
         // ============================================
         // admin LOGIN - Use lowercase 'admin'
         // ============================================
-        if (role === 'admin') {
+        if (role === 'ADMIN') {
             const adminResult = await executeQuery(
                 'SELECT AdminId as id, username as name, password FROM admin WHERE username = ?',
                 [email]
