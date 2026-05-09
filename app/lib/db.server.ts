@@ -14,7 +14,7 @@ function getPool() {
       waitForConnections: true,
       connectionLimit: 10,
       ssl: {
-        rejectUnauthorized: true  // Required for Aiven
+        rejectUnauthorized: false  // ✅ This bypasses the certificate error
       }
     });
   }
