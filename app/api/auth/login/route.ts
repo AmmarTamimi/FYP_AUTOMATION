@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         // ============================================
         // TEACHER LOGIN - Use lowercase 'teachers'
         // ============================================
-        if (role === 'teacher') {
+        if (role === 'TEACHER') {
             const teacherResult = await executeQuery(
                 'SELECT TeacherId as id, name, email, password FROM teachers WHERE email = ?',
                 [email]
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
         // ============================================
         // STUDENT GROUP LOGIN - Use lowercase 'studentgroup'
         // ============================================
-        if (role === 'student') {
+        if (role === 'STUDENT') {
             const groupResult = await executeQuery(
                 'SELECT groupId as id, groupUsername as name, groupPass as password, leaderEmail FROM studentgroup WHERE groupUsername = ?',
                 [email]
