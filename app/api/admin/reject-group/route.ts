@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     
     // Update group status to DENIED
     await executeQuery(
-      'UPDATE studentgroup SET status = "DENIED" WHERE groupId = ?',
+      "UPDATE studentgroup SET status = 'DENIED' WHERE groupId = ?",
       [groupId]
     );
     

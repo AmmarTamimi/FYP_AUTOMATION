@@ -1059,59 +1059,64 @@ const handleCancelRejection = () => {
     </div>
   );
 
-  // ============================================
-// Rejection Reason Modal
+ // ============================================
+// Modern Rejection Modal
 // ============================================
 const RejectionModal = () => (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      {/* Modal Header */}
+      <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
             <XCircle className="w-4 h-4 text-red-600" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-800">Reject Group</h3>
+          <h3 className="text-md font-semibold text-gray-800">Reject Group</h3>
         </div>
         <button 
           onClick={handleCancelRejection}
           className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
         >
-          <X className="w-5 h-5 text-gray-400" />
+          <X className="w-4 h-4 text-gray-400" />
         </button>
       </div>
       
-      <div className="p-6 space-y-4">
+      {/* Modal Body */}
+      <div className="p-5 space-y-4">
+        {/* Warning Banner */}
         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-sm text-red-700">
-            ⚠️ This action cannot be undone. The group will be rejected and the leader will be notified via email.
+          <p className="text-xs text-red-700">
+            ⚠️ This action cannot be undone. The group leader will be notified via email.
           </p>
         </div>
         
+        {/* Reason Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Reason for Rejection *
           </label>
-          <textarea
+          <input
             value={rejectModal.reason}
             onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+            
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-gray-700"
             placeholder="Please provide a clear reason for rejection..."
             autoFocus
+            dir="ltr"
           />
           <p className="text-xs text-gray-500 mt-1">
             This reason will be sent to the group leader's email.
           </p>
         </div>
         
-        {/* Suggestions for rejection reasons */}
-        <div className="border-t border-gray-100 pt-3">
-          <p className="text-xs font-medium text-gray-500 mb-2">Suggestions:</p>
+        {/* Quick Suggestions */}
+        <div>
+          <p className="text-xs text-gray-500 mb-2">Quick suggestions:</p>
           <div className="flex flex-wrap gap-2">
             {[
               "Insufficient group members",
               "Invalid email format",
-              "Project domain not matching",
+              "Project domain mismatch",
               "Incomplete application",
               "Supervisor not available",
               "Duplicate registration"
@@ -1120,7 +1125,7 @@ const RejectionModal = () => (
                 key={suggestion}
                 type="button"
                 onClick={() => setRejectModal(prev => ({ ...prev, reason: suggestion }))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
               >
                 {suggestion}
               </button>
@@ -1129,18 +1134,20 @@ const RejectionModal = () => (
         </div>
       </div>
       
-      <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+      {/* Modal Footer */}
+      <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
         <button
           onClick={handleCancelRejection}
-          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
         >
           Cancel
         </button>
         <button
           onClick={handleConfirmRejection}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+          disabled={!rejectModal.reason.trim()}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <XCircle className="w-4 h-4" />
+          <XCircle className="w-3.5 h-3.5" />
           Confirm Rejection
         </button>
       </div>
@@ -1572,6 +1579,7 @@ const ViewGroupModal = () => {
       {showCredentials.show && <CredentialsModal />}
       {/* View Group Modal */}
       {showGroupModal.show && <ViewGroupModal />}
+      {rejectModal.show && <RejectionModal/>}
     </div>
   );
 }
