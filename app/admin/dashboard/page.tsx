@@ -347,6 +347,11 @@ export default function AdminDashboard() {
     show: false,
     group: null,
 });
+const [rejectModal, setRejectModal] = useState<{ show: boolean; groupId: number | null; reason: string }>({
+  show: false,
+  groupId: null,
+  reason: ""
+});
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [showCredentials, setShowCredentials] = useState<{
@@ -485,24 +490,45 @@ export default function AdminDashboard() {
     }
   };
 
-  // Reject Group
-  const handleRejectGroup = async (groupId: number) => {
-    if (confirm("Are you sure you want to reject this group?")) {
-      try {
-        const response = await fetch("/api/admin/reject-group", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ groupId }),
-        });
+ const handleRejectGroup = (groupId: number) => {
+  setRejectModal({ show: true, groupId, reason: "" });
+};
 
-        if (response.ok) {
-          fetchDashboardData();
-        }
-      } catch (error) {
-        console.error("Error rejecting group:", error);
-      }
+const handleConfirmRejection = async () => {
+  const { groupId, reason } = rejectModal;
+  
+  if (!groupId) return;
+  
+  // Validate reason
+  if (!reason.trim()) {
+    alert("Please enter a reason for rejection.");
+    return;
+  }
+  
+  try {
+    const response = await fetch("/api/admin/reject-group", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId, reason: reason.trim() }),
+    });
+
+    if (response.ok) {
+      setRejectModal({ show: false, groupId: null, reason: "" });
+      fetchDashboardData();
+      alert("Group rejected successfully. Notification email sent to leader.");
+    } else {
+      const data = await response.json();
+      alert(data.message || "Failed to reject group");
     }
-  };
+  } catch (error) {
+    console.error("Error rejecting group:", error);
+    alert("Network error. Please try again.");
+  }
+};
+
+const handleCancelRejection = () => {
+  setRejectModal({ show: false, groupId: null, reason: "" });
+};
 
   // Generate random password
   const generateRandomPassword = () => {
@@ -1032,6 +1058,95 @@ export default function AdminDashboard() {
       )}
     </div>
   );
+
+  // ============================================
+// Rejection Reason Modal
+// ============================================
+const RejectionModal = () => (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+            <XCircle className="w-4 h-4 text-red-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800">Reject Group</h3>
+        </div>
+        <button 
+          onClick={handleCancelRejection}
+          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <X className="w-5 h-5 text-gray-400" />
+        </button>
+      </div>
+      
+      <div className="p-6 space-y-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <p className="text-sm text-red-700">
+            ⚠️ This action cannot be undone. The group will be rejected and the leader will be notified via email.
+          </p>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reason for Rejection *
+          </label>
+          <textarea
+            value={rejectModal.reason}
+            onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+            placeholder="Please provide a clear reason for rejection..."
+            autoFocus
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            This reason will be sent to the group leader's email.
+          </p>
+        </div>
+        
+        {/* Suggestions for rejection reasons */}
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-xs font-medium text-gray-500 mb-2">Suggestions:</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Insufficient group members",
+              "Invalid email format",
+              "Project domain not matching",
+              "Incomplete application",
+              "Supervisor not available",
+              "Duplicate registration"
+            ].map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setRejectModal(prev => ({ ...prev, reason: suggestion }))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <button
+          onClick={handleCancelRejection}
+          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirmRejection}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+        >
+          <XCircle className="w-4 h-4" />
+          Confirm Rejection
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
   // ============================================
   // View Group Modal
