@@ -143,8 +143,9 @@ export async function POST(req: NextRequest) {
 
         const result = await cloudinary.uploader.upload(dataUri, {
           folder: "fyp_proposals",
-          resource_type: "auto",
+          resource_type: "raw",
           public_id: `${groupUsername}_${Date.now()}_${document.name.replace(/\s/g, "_")}`,
+          access_mode: 'public',
         });
 
         documentUrl = result.secure_url;

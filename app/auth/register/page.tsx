@@ -328,7 +328,7 @@ export default function RegisterPage() {
                       </label>
                       <input
                         type="text"
-                        required
+                        required={memberNumber !== 3}
                         value={member.name}
                         onChange={(e) =>
                           handleMemberChange(index, "name", e.target.value)
@@ -343,7 +343,7 @@ export default function RegisterPage() {
                       </label>
                       <input
                         type="text"
-                        required
+                        required={memberNumber !== 3}
                         value={member.rollNo}
                         onChange={(e) =>
                           handleMemberChange(index, "rollNo", e.target.value)
@@ -358,7 +358,7 @@ export default function RegisterPage() {
                       </label>
                       <input
                         type="email"
-                        required
+                        required={memberNumber !== 3}
                         value={member.email}
                         onChange={(e) =>
                           handleMemberChange(index, "email", e.target.value)
@@ -382,7 +382,7 @@ export default function RegisterPage() {
                       </label>
                       <input
                         type="text"
-                        required
+                        required={memberNumber !== 3}
                         value={member.section}
                         onChange={(e) =>
                           handleMemberChange(index, "section", e.target.value)
