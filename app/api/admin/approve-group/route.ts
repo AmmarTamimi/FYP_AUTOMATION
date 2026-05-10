@@ -1,7 +1,7 @@
+// app/api/admin/approve-group/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { executeQuery } from "@/app/lib/db.server";
 
-// app/api/admin/approve-group/route.ts - Add more logging
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
@@ -20,17 +20,45 @@ export async function POST(req: NextRequest) {
         
         console.log("Check result:", JSON.stringify(checkGroup, null, 2));
         
-        // If group exists, try to update
-        if ((checkGroup as any[]).length > 0) {
-            console.log("Attempting UPDATE...");
-            const updateResult = await executeQuery(
-                'UPDATE studentgroup SET status = "VERIFIED", groupPass = ? WHERE groupId = ?',
-                [password, groupId]
+        if ((checkGroup as any[]).length === 0) {
+            return NextResponse.json(
+                { message: 'Group not found' },
+                { status: 404 }
             );
-            console.log("Update result:", updateResult);
         }
         
-        return NextResponse.json({ success: true });
+        const groupStatus = (checkGroup as any[])[0]?.status;
+        
+        if (groupStatus !== 'PENDING') {
+            return NextResponse.json(
+                { message: `Group is already ${groupStatus}. Cannot approve again.` },
+                { status: 400 }
+            );
+        }
+        
+        // ✅ FIXED: Use single quotes around the string value
+        const updateResult = await executeQuery(
+            "UPDATE studentgroup SET status = 'VERIFIED', groupPass = ? WHERE groupId = ?",
+            [password, groupId]
+        );
+        
+        console.log("Update result:", updateResult);
+        
+        const groupDetails = await executeQuery(
+            'SELECT groupUsername, leaderEmail FROM studentgroup WHERE groupId = ?',
+            [groupId]
+        );
+        
+        const leaderEmail = (groupDetails as any[])[0]?.leaderEmail;
+        const groupUsername = (groupDetails as any[])[0]?.groupUsername;
+        
+        return NextResponse.json({ 
+            success: true, 
+            message: 'Group approved successfully',
+            leaderEmail: leaderEmail,
+            groupUsername: groupUsername,
+            password: password
+        });
         
     } catch (error) {
         console.error("ERROR DETAILS:", error);
