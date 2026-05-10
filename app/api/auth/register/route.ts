@@ -1,4 +1,4 @@
-import cloudinary from "@/app/lib/cloudinary";
+import { getCloudinaryInstance } from "@/app/lib/cloudinary";
 import { executeQuery } from "@/app/lib/db.server";
 import { mkdir, writeFile } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
@@ -131,51 +131,32 @@ export async function POST(req: NextRequest) {
 
     // 5. Save proposal document - Upload to Cloudinary
     // 5. Save proposal document - Upload to Cloudinary
-let documentUrl = null;
+    let documentUrl = null;
+    if (document) {
+      try {
+        // Get a newly configured instance right before using it
+        const cloudinary = getCloudinaryInstance();
 
-if (document) {
-    try {
-        console.log("=== CLOUDINARY UPLOAD START ===");
-        console.log("File name:", document.name);
-        console.log("File size:", document.size);
-        console.log("File type:", document.type);
-        
-        // Check if Cloudinary is configured
-        console.log("Cloudinary config check:", {
-            hasCloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
-            hasApiKey: !!process.env.CLOUDINARY_API_KEY,
-            hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
-        });
-        
-        // Convert file to base64
         const buffer = Buffer.from(await document.arrayBuffer());
-        const base64String = buffer.toString('base64');
+        const base64String = buffer.toString("base64");
         const dataUri = `data:${document.type};base64,${base64String}`;
-        
-        console.log("Uploading to Cloudinary...");
-        
-        // Upload to Cloudinary
-        const result = await cloudinary.uploader.upload(dataUri, {
-            folder: 'fyp_proposals',
-            resource_type: 'auto',
-            public_id: `${groupUsername}_${Date.now()}_${document.name.replace(/\s/g, '_')}`
-        });
-        
-        documentUrl = result.secure_url;
-        console.log("✅ Cloudinary upload successful!");
-        console.log("File URL:", documentUrl);
-        
-    } catch (uploadError) {
-        console.error("❌ Cloudinary upload error:", uploadError);
-        console.error("Error details:", JSON.stringify(uploadError, null, 2));
-        // Don't fail registration, just log the error
-        // documentUrl remains null
-    }
-} else {
-    console.log("No document file provided");
-}
 
-console.log("Final documentUrl:", documentUrl);
+        const result = await cloudinary.uploader.upload(dataUri, {
+          folder: "fyp_proposals",
+          resource_type: "auto",
+          public_id: `${groupUsername}_${Date.now()}_${document.name.replace(/\s/g, "_")}`,
+        });
+
+        documentUrl = result.secure_url;
+        console.log("File uploaded to Cloudinary:", documentUrl);
+      } catch (uploadError) {
+        console.error("Cloudinary upload error:", uploadError);
+      }
+    } else {
+      console.log("No document file provided");
+    }
+
+    console.log("Final documentUrl:", documentUrl);
 
     // 6. Generate new Project ID FIRST (before the loop)
     const nextIdResult = await executeQuery(
@@ -185,18 +166,18 @@ console.log("Final documentUrl:", documentUrl);
 
     // 7. Insert project details - ONE ROW PER DOMAIN
     for (const domainName of domains) {
-    const projectQuery = `
+      const projectQuery = `
         INSERT INTO project (PROJECTID, DOMAIN, GROUPID, PROPOSALDOCUMENT, PROJECTTITLE) 
         VALUES (?, ?, ?, ?, ?)
     `;
-    await executeQuery(projectQuery, [
+      await executeQuery(projectQuery, [
         newProjectId,
         domainName.trim(),
         newGroupId,
-        documentUrl,  // This will be null if upload failed, or URL if succeeded
+        documentUrl, // This will be null if upload failed, or URL if succeeded
         projectTitle,
-    ]);
-}
+      ]);
+    }
     console.log(
       `Inserted ${domains.length} project rows for ProjectID: ${newProjectId}`,
     );

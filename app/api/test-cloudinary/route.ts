@@ -1,24 +1,25 @@
 // app/api/test-cloudinary/route.ts
-import cloudinary from "@/app/lib/cloudinary";
 import { NextResponse } from "next/server";
+import { getCloudinaryInstance } from "@/app/lib/cloudinary";
 
 export async function GET() {
   try {
-    console.log("Testing Cloudinary with CLOUDINARY_URL...");
-    
+    // Get a new instance that is configured right now
+    const cloudinary = getCloudinaryInstance();
+
     const result = await cloudinary.uploader.upload('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', {
       folder: 'fyp_test'
     });
-    
-    return NextResponse.json({ 
-      success: true, 
-      url: result.secure_url 
+
+    return NextResponse.json({
+      success: true,
+      url: result.secure_url,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Cloudinary error:", error);
-    return NextResponse.json({ 
-      success: false, 
-      error: (error as Error).message 
+    return NextResponse.json({
+      success: false,
+      error: error.message,
     }, { status: 500 });
   }
 }
