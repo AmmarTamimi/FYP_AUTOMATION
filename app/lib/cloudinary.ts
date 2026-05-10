@@ -1,11 +1,9 @@
 // lib/cloudinary.ts
 import { v2 as cloudinary } from 'cloudinary';
 
-// Configure Cloudinary with explicit values
+// Cloudinary automatically reads from CLOUDINARY_URL environment variable
+// No explicit config needed if CLOUDINARY_URL is set
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dvcihuzpz',
-  api_key: process.env.CLOUDINARY_API_KEY || '713972188835876',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'CxbUqONTuHT5AMbr5u8roYq5QIs',
   secure: true,
 });
 
