@@ -1,9 +1,11 @@
 // app/api/admin/reject-group/route.ts
 import { NextResponse, NextRequest } from "next/server";
-import { executeQuery } from "@/app/lib/db.server";
+import { executeQuery, getConnection } from "@/app/lib/db.server";
 import { sendGroupRejectionEmail } from "@/app/lib/email";
 
 export async function POST(req: NextRequest) {
+  let connection;
+  
   try {
     const body = await req.json();
     const groupId = body.groupId;
@@ -12,7 +14,7 @@ export async function POST(req: NextRequest) {
     console.log(`=== Rejecting Group ID: ${groupId} ===`);
     console.log(`Reason: ${reason}`);
     
-    // Get group details before updating
+    // Get group details before updating (outside transaction)
     const groupDetails = await executeQuery(
       'SELECT groupUsername, leaderEmail FROM studentgroup WHERE groupId = ?',
       [groupId]
@@ -28,13 +30,28 @@ export async function POST(req: NextRequest) {
     const groupUsername = (groupDetails as any[])[0]?.groupUsername;
     const leaderEmail = (groupDetails as any[])[0]?.leaderEmail;
     
+    // ============================================
+    // START TRANSACTION
+    // ============================================
+    connection = await getConnection();
+    await connection.beginTransaction();
+    console.log("📦 Transaction started");
+    
     // Update group status to DENIED
-    await executeQuery(
+    await connection.execute(
       "UPDATE studentgroup SET status = 'DENIED' WHERE groupId = ?",
       [groupId]
     );
     
-    // Send rejection email
+    console.log(`✅ Group ${groupId} rejected`);
+    
+    // Commit transaction
+    await connection.commit();
+    console.log("✅ Transaction committed");
+    
+    // ============================================
+    // Send rejection email (outside transaction)
+    // ============================================
     let emailSent = false;
     if (leaderEmail && groupUsername) {
       const emailResult = await sendGroupRejectionEmail(leaderEmail, groupUsername, reason);
@@ -57,10 +74,17 @@ export async function POST(req: NextRequest) {
     });
     
   } catch (error) {
+    // Rollback on error
+    if (connection) {
+      await connection.rollback();
+      console.error("❌ Transaction rolled back");
+    }
     console.error('Error rejecting group:', error);
     return NextResponse.json(
-      { message: 'Error in rejecting group' },
+      { message: 'Error in rejecting group: ' + (error as Error).message },
       { status: 500 }
     );
+  } finally {
+    if (connection) connection.release();
   }
 }

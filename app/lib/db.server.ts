@@ -31,3 +31,9 @@ export async function executeQuery<T = any>(query: string, params: any[] = []): 
     throw error;
   }
 }
+
+// For transactions (returns connection)
+export async function getConnection() {
+  const pool = getPool();
+  return await pool.getConnection();
+}

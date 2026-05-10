@@ -80,14 +80,33 @@ interface Project {
   GROUPID: number;
 }
 
+interface TeacherSchedule {
+  scheduleId: number;
+  dateVal: string;
+  day: string;
+  startTime: string;
+  endTime: string;
+  venue: string;
+  venueCapacity: number;
+  groupId: number;
+  groupUsername: string;
+  projectTitle: string;
+  leaderEmail: string;
+  status: string;
+}
+
 export default function TeacherDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "students">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "students" | "schedule"
+  >("overview");
+
+  const [teacherSchedule, setTeacherSchedule] = useState<TeacherSchedule[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   // Data states
   const [teacher, setTeacher] = useState<Teacher | null>(null);
@@ -126,71 +145,173 @@ export default function TeacherDashboard() {
     }
     setUser(parsedUser);
     fetchTeacherData();
+    fetchTeacherSchedule();
   }, []);
 
   const fetchTeacherData = async () => {
-    setLoading(true);
-    try {
-      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const teacherEmail = storedUser.email;
-
-      // 1. Fetch teacher details
-      const teacherRes = await fetch(
-        `/api/teacher/profile?email=${teacherEmail}`,
-      );
-      let teacherData = await teacherRes.json();
-      const teacherObj = Array.isArray(teacherData)
-        ? teacherData[0]
-        : teacherData;
-      setTeacher(teacherObj);
-
-      if (teacherObj) {
-        // 2. Fetch assigned groups
-        const groupsRes = await fetch(
-          `/api/teacher/groups?teacherId=${teacherObj.TeacherId}`,
-        );
-        let groupsData = await groupsRes.json();
-        const groups = Array.isArray(groupsData)
-          ? groupsData
-          : groupsData.groupId
-            ? [groupsData]
-            : [];
-        setAssignedGroups(groups);
-
-        // 3. Calculate stats
-        let totalStudents = 0;
-        let verifiedCount = 0;
-        let pendingCount = 0;
-
-        for (const group of groups) {
-          const membersRes = await fetch(
-            `/api/student/group/members?groupId=${group.groupId}`,
-          );
-          let membersData = await membersRes.json();
-          const members = Array.isArray(membersData)
-            ? membersData
-            : membersData.stdId
-              ? [membersData]
-              : [];
-          totalStudents += members.length;
-
-          if (group.status === "VERIFIED") verifiedCount++;
-          if (group.status === "PENDING") pendingCount++;
-        }
-
-        setStats({
-          totalGroups: groups.length,
-          totalStudents: totalStudents,
-          verifiedGroups: verifiedCount,
-          pendingGroups: pendingCount,
-        });
+  setLoading(true);
+  try {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const teacherEmail = storedUser.email;
+    console.log("=== FETCH TEACHER DATA START ===");
+    console.log("Teacher email:", teacherEmail);
+    
+    // 1. Fetch teacher details
+    const teacherRes = await fetch(`/api/teacher/profile?email=${teacherEmail}`);
+    let teacherData = await teacherRes.json();
+    const teacherObj = Array.isArray(teacherData) ? teacherData[0] : teacherData;
+    console.log("Teacher object:", teacherObj);
+    setTeacher(teacherObj);
+    
+    if (teacherObj) {
+      // 2. Fetch assigned groups
+      const groupsRes = await fetch(`/api/teacher/groups?teacherId=${storedUser.id}`);
+      console.log("teacher id: ",storedUser.id);
+      console.log("Groups API response status:", groupsRes.status);
+      
+      let groupsData = await groupsRes.json();
+      console.log("Raw groups data:", groupsData);
+      
+      // Handle both array and object response
+      const groups = Array.isArray(groupsData) ? groupsData : (groupsData.groupId ? [groupsData] : []);
+      console.log("Processed groups:", groups);
+      console.log("Number of groups found:", groups.length);
+      setAssignedGroups(groups);
+      
+      // 3. Calculate stats by fetching members for each group
+      let totalStudents = 0;
+      let verifiedCount = 0;
+      let pendingCount = 0;
+      
+      for (const group of groups) {
+        console.log(`Fetching members for group ${group.groupId} (${group.groupUsername})`);
+        const membersRes = await fetch(`/api/student/group/members?groupId=${group.groupId}`);
+        let membersData = await membersRes.json();
+        const members = Array.isArray(membersData) ? membersData : (membersData.stdId ? [membersData] : []);
+        console.log(`Group ${group.groupUsername} has ${members.length} members`);
+        totalStudents += members.length;
+        
+        if (group.status === 'VERIFIED') verifiedCount++;
+        if (group.status === 'PENDING') pendingCount++;
       }
-    } catch (error) {
-      console.error("Error fetching teacher data:", error);
-    } finally {
-      setLoading(false);
+      
+      setStats({
+        totalGroups: groups.length,
+        totalStudents: totalStudents,
+        verifiedGroups: verifiedCount,
+        pendingGroups: pendingCount
+      });
     }
-  };
+    
+  } catch (error) {
+    console.error('Error fetching teacher data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const fetchTeacherSchedule = async () => {
+  console.log("=== FETCH TEACHER SCHEDULE START ===");
+  setScheduleLoading(true);
+  try {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const teacherEmail = storedUser.email;
+    console.log("📧 Teacher email from localStorage:", teacherEmail);
+
+    // First get teacher ID
+    console.log("🔍 Fetching teacher profile...");
+    const teacherRes = await fetch(`/api/teacher/profile?email=${teacherEmail}`);
+    console.log("📡 Teacher API response status:", teacherRes.status);
+    
+    const teacherData = await teacherRes.json();
+    console.log("📋 Teacher data received:", teacherData);
+    
+    const teacherId = teacherData?.teacherId;
+    console.log("🆔 Extracted teacherId:", teacherId);
+
+    if (teacherId) {
+      console.log("🔍 Fetching schedule for teacherId:", teacherId);
+      const scheduleRes = await fetch(`/api/teacher/schedule?teacherId=${teacherId}`);
+      console.log("📡 Schedule API response status:", scheduleRes.status);
+      
+      const scheduleData = await scheduleRes.json();
+      console.log("📋 Schedule data received:", scheduleData);
+      console.log("📋 Schedule data type:", typeof scheduleData);
+      console.log("📋 Is array:", Array.isArray(scheduleData));
+      console.log("📋 Schedule length:", scheduleData?.length);
+      
+      setTeacherSchedule(scheduleData);
+
+      // Set default selected date to first available date
+      if (scheduleData && scheduleData.length > 0) {
+        console.log("📅 Setting selected date to:", scheduleData[0].dateVal);
+        setSelectedDate(scheduleData[0].dateVal);
+      } else {
+        console.log("⚠️ No schedule data found for teacher");
+      }
+    } else {
+      console.log("❌ No teacherId extracted from teacher data");
+    }
+  } catch (error) {
+    console.error("❌ Error fetching teacher schedule:", error);
+  } finally {
+    setScheduleLoading(false);
+    console.log("=== FETCH TEACHER SCHEDULE END ===");
+  }
+};
+
+  // Get unique dates from schedule
+ // Get unique dates from schedule - FIXED to handle dateVal correctly
+const uniqueDates = teacherSchedule.reduce((acc, item) => {
+  const dateKey = item.dateVal ? new Date(item.dateVal).toDateString() : '';
+  if (dateKey && !acc.some(d => d.dateKey === dateKey)) {
+    acc.push({
+      dateKey: dateKey,
+      date: item.dateVal,
+      day: item.day,
+      originalDate: item.dateVal
+    });
+  }
+  return acc;
+}, [] as { dateKey: string; date: string; day: string; originalDate: string }[]);
+
+// Set default selected date
+useEffect(() => {
+  if (teacherSchedule.length > 0 && !selectedDate && uniqueDates.length > 0) {
+    setSelectedDate(uniqueDates[0].date);
+  }
+}, [teacherSchedule, uniqueDates, selectedDate]);
+
+  // Group schedule by date
+  // Group schedule by date - FIXED to use dateVal
+const scheduleByDate = teacherSchedule.reduce(
+  (acc, item) => {
+    const dateKey = item.dateVal ? new Date(item.dateVal).toDateString() : '';
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(item);
+    return acc;
+  },
+  {} as Record<string, typeof teacherSchedule>
+);
+
+// Sort groups by time for each date
+Object.keys(scheduleByDate).forEach((dateKey) => {
+  scheduleByDate[dateKey].sort(
+    (a, b) =>
+      new Date(`1970/01/01 ${a.startTime}`).getTime() -
+      new Date(`1970/01/01 ${b.startTime}`).getTime()
+  );
+});
+
+  // Sort groups by time for each date
+  Object.keys(scheduleByDate).forEach((date) => {
+    scheduleByDate[date].sort(
+      (a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
+  });
 
   const handleViewGroup = async (group: StudentGroup) => {
     try {
@@ -299,6 +420,19 @@ export default function TeacherDashboard() {
             <span className="text-sm font-medium">Assigned Groups</span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab("schedule")}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+            activeTab === "schedule"
+              ? "bg-[#3F51B5] text-white shadow-lg"
+              : "text-[#9FA8DA] hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          <Calendar className="w-5 h-5" />
+          {!sidebarCollapsed && (
+            <span className="text-sm font-medium">Schedule</span>
+          )}
+        </button>
       </nav>
 
       {/* Profile Section in Sidebar */}
@@ -356,229 +490,581 @@ export default function TeacherDashboard() {
         </div>
       );
     }
-return (
+    return (
+      <div className="space-y-6">
+        {/* Welcome Card - Using your theme color with better contrast */}
+        <div className="bg-blue-500 rounded-xl p-6 shadow-lg">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Welcome back, {teacher.name}!
+              </h2>
+              <p className="text-blue-100 text-sm">
+                Manage your FYP evaluations and assigned groups
+              </p>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full">
+                  <Briefcase className="w-3.5 h-3.5 text-blue-100" />
+                  <span className="text-xs text-white font-medium">
+                    {teacher.role === "senior"
+                      ? "Senior Evaluator"
+                      : "Junior Evaluator"}
+                  </span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full">
+                  <Award className="w-3.5 h-3.5 text-blue-100" />
+                  <span className="text-xs text-white font-medium">
+                    {teacher.specialization}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="hidden md:block mt-4 md:mt-0">
+              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
 
-  <div className="space-y-6">
-      {/* Welcome Card - Using your theme color with better contrast */}
-      <div className="bg-blue-500 rounded-xl p-6 shadow-lg">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Welcome back, {teacher.name}!
-            </h2>
-            <p className="text-blue-100 text-sm">
-              Manage your FYP evaluations and assigned groups
+        {/* Stats Cards - Fixed with solid backgrounds and white icons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">
+                  Assigned Groups
+                </p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {stats.totalGroups}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">
+                  Total Students
+                </p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {stats.totalStudents}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center shadow-sm">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">
+                  Verified Groups
+                </p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {stats.verifiedGroups}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center shadow-sm">
+                <CheckCircle className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">
+                  Pending Groups
+                </p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {stats.pendingGroups}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm">
+                <Clock className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Teacher Profile Information */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Profile Information
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Your professional details
             </p>
-            <div className="flex flex-wrap gap-2 mt-4">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full">
-                <Briefcase className="w-3.5 h-3.5 text-blue-100" />
-                <span className="text-xs text-white font-medium">
-                  {teacher.role === "senior"
-                    ? "Senior Evaluator"
-                    : "Junior Evaluator"}
-                </span>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <User className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Full Name</p>
+                  <p className="font-medium text-gray-800">{teacher.name}</p>
+                </div>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full">
-                <Award className="w-3.5 h-3.5 text-blue-100" />
-                <span className="text-xs text-white font-medium">
-                  {teacher.specialization}
-                </span>
+
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Email Address</p>
+                  <p className="font-medium text-gray-800">{teacher.email}</p>
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="hidden md:block mt-4 md:mt-0">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center">
-              <GraduationCap className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Stats Cards - Fixed with solid backgrounds and white icons */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">
-                Assigned Groups
-              </p>
-              <p className="text-2xl font-bold text-gray-800">
-                {stats.totalGroups}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
-              <Users className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                  <BookOpen className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Specialization</p>
+                  <p className="font-medium text-gray-800">
+                    {teacher.specialization}
+                  </p>
+                </div>
+              </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">
-                Total Students
-              </p>
-              <p className="text-2xl font-bold text-gray-800">
-                {stats.totalStudents}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-green-600 flex items-center justify-center shadow-sm">
-              <GraduationCap className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <Award className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Qualification</p>
+                  <p className="font-medium text-gray-800">
+                    {teacher.qualification}
+                  </p>
+                </div>
+              </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">
-                Verified Groups
-              </p>
-              <p className="text-2xl font-bold text-gray-800">
-                {stats.verifiedGroups}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center shadow-sm">
-              <CheckCircle className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center">
+                  <Briefcase className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Experience</p>
+                  <p className="font-medium text-gray-800">
+                    {teacher.experience} years
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">
-                Pending Groups
-              </p>
-              <p className="text-2xl font-bold text-gray-800">
-                {stats.pendingGroups}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm">
-              <Clock className="w-6 h-6 text-white" />
-            </div>
+        {/* Quick Actions */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Quick Actions
+            </h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Manage your profile and view students
+            </p>
           </div>
-        </div>
-      </div>
-
-      {/* Teacher Profile Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-          <h3 className="text-lg font-semibold text-gray-800">
-            Profile Information
-          </h3>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Your professional details
-          </p>
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                <User className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Full Name</p>
-                <p className="font-medium text-gray-800">{teacher.name}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                <Mail className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Email Address</p>
-                <p className="font-medium text-gray-800">{teacher.email}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Specialization</p>
-                <p className="font-medium text-gray-800">
-                  {teacher.specialization}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                <Award className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Qualification</p>
-                <p className="font-medium text-gray-800">
-                  {teacher.qualification}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-rose-600" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Experience</p>
-                <p className="font-medium text-gray-800">
-                  {teacher.experience} years
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-          <h3 className="text-lg font-semibold text-gray-800">Quick Actions</h3>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Manage your profile and view students
-          </p>
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link
-              href="/teacher/profile"
-              className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-200 group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#3F51B5]/10 flex items-center justify-center group-hover:bg-[#3F51B5]/20 transition-colors">
-                <Edit className="w-5 h-5 text-[#3F51B5]" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-gray-800">Edit Profile</p>
-                <p className="text-sm text-gray-500">
-                  Update your password or qualification
-                </p>
-              </div>
-            </Link>
-
-            <button
-              onClick={() => setActiveTab("students")}
-              className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-200 group text-left"
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link
+                href="/teacher/profile"
+                className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-200 group"
               >
-              <div className="w-10 h-10 rounded-xl bg-[#3F51B5]/10 flex items-center justify-center group-hover:bg-[#3F51B5]/20 transition-colors">
-                <Users className="w-5 h-5 text-[#3F51B5]" />
-              </div>
-              <div>
-                <p className="font-medium text-gray-800">
-                  View Assigned Groups
-                </p>
-                <p className="text-sm text-gray-500">
-                  See groups assigned for evaluation
-                </p>
-              </div>
-            </button>
+                <div className="w-10 h-10 rounded-xl bg-[#3F51B5]/10 flex items-center justify-center group-hover:bg-[#3F51B5]/20 transition-colors">
+                  <Edit className="w-5 h-5 text-[#3F51B5]" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-gray-800">Edit Profile</p>
+                  <p className="text-sm text-gray-500">
+                    Update your password or qualification
+                  </p>
+                </div>
+              </Link>
+
+              <button
+                onClick={() => setActiveTab("students")}
+                className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-200 group text-left"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[#3F51B5]/10 flex items-center justify-center group-hover:bg-[#3F51B5]/20 transition-colors">
+                  <Users className="w-5 h-5 text-[#3F51B5]" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-800">
+                    View Assigned Groups
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    See groups assigned for evaluation
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-)
+    );
   };
+
+  // ============================================
+  // Teacher Schedule Tab
+  // ============================================
+  const TeacherScheduleTab = () => {
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+
+  // Format date helper
+  const formatDisplayDate = (dateString: string) => {
+    if (!dateString) return "Date TBA";
+
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date:", dateString);
+      return "Date TBA";
+    }
+
+    const day = date.getDate();
+    const suffix =
+      day % 10 === 1
+        ? "st"
+        : day % 10 === 2
+          ? "nd"
+          : day % 10 === 3
+            ? "rd"
+            : "th";
+    return `${day}${suffix} ${date.toLocaleString("default", { month: "long" })} ${date.getFullYear()}`;
+  };
+
+  // Get unique dates from schedule using dateVal
+  const uniqueDates = teacherSchedule.reduce((acc, item) => {
+    if (!item.dateVal) return acc;
+    const dateKey = new Date(item.dateVal).toDateString();
+    if (!acc.some(d => d.dateKey === dateKey)) {
+      acc.push({
+        dateKey: dateKey,
+        dateVal: item.dateVal,
+        day: item.day
+      });
+    }
+    return acc;
+  }, [] as { dateKey: string; dateVal: string; day: string }[]);
+
+  // Group schedule by dateKey
+  const scheduleByDate = teacherSchedule.reduce(
+    (acc, item) => {
+      if (!item.dateVal) return acc;
+      const dateKey = new Date(item.dateVal).toDateString();
+      if (!acc[dateKey]) {
+        acc[dateKey] = [];
+      }
+      acc[dateKey].push(item);
+      return acc;
+    },
+    {} as Record<string, typeof teacherSchedule>
+  );
+
+  // Sort groups by time for each date
+  Object.keys(scheduleByDate).forEach((dateKey) => {
+    scheduleByDate[dateKey].sort(
+      (a, b) =>
+        new Date(`1970/01/01 ${a.startTime}`).getTime() -
+        new Date(`1970/01/01 ${b.startTime}`).getTime()
+    );
+  });
+
+  // Set default selected date when data loads
+  useEffect(() => {
+    if (teacherSchedule.length > 0 && uniqueDates.length > 0 && !selectedDate) {
+      setSelectedDate(uniqueDates[0].dateVal);
+    }
+  }, [teacherSchedule, uniqueDates, selectedDate]);
+
+  if (scheduleLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#3F51B5] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading schedule...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (teacherSchedule.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Calendar className="w-10 h-10 text-gray-400" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-800 mb-2">
+          No Schedule Assigned
+        </h3>
+        <p className="text-gray-500">
+          You haven't been assigned to any evaluation schedules yet.
+        </p>
+        <p className="text-sm text-gray-400 mt-2">
+          Schedules will appear here once admin creates them.
+        </p>
+      </div>
+    );
+  }
+
+  // Reuse existing handleViewGroup function
+  const handleViewGroupSchedule = async (groupId: number) => {
+    try {
+      const groupRes = await fetch(`/api/student/view-group?groupId=${groupId}`);
+      const groupData = await groupRes.json();
+      const fullGroup = Array.isArray(groupData) ? groupData[0] : groupData;
+      await handleViewGroup(fullGroup);
+    } catch (error) {
+      console.error("Error fetching group for schedule:", error);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header with View Toggle */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Evaluation Schedule
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Your assigned groups for evaluation
+          </p>
+        </div>
+
+        <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              viewMode === "list"
+                ? "bg-white text-[#3F51B5] shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            List View
+          </button>
+          <button
+            onClick={() => setViewMode("calendar")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              viewMode === "calendar"
+                ? "bg-white text-[#3F51B5] shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Calendar View
+          </button>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-2xl font-bold text-gray-800">{teacherSchedule.length}</p>
+          <p className="text-sm text-gray-500">Total Groups</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-2xl font-bold text-gray-800">{uniqueDates.length}</p>
+          <p className="text-sm text-gray-500">Evaluation Days</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-2xl font-bold text-gray-800">
+            {teacherSchedule.filter((s) => new Date(s.dateVal) > new Date()).length}
+          </p>
+          <p className="text-sm text-gray-500">Upcoming</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <p className="text-2xl font-bold text-gray-800">
+            {[...new Set(teacherSchedule.map((s) => s.venue))].length}
+          </p>
+          <p className="text-sm text-gray-500">Venues</p>
+        </div>
+      </div>
+
+      {/* Date Selector for Quick Navigation */}
+      <div className="flex flex-wrap gap-2 pb-2 overflow-x-auto">
+        {uniqueDates.map((dateItem, idx) => (
+          <button
+            key={idx}
+            onClick={() => setSelectedDate(dateItem.dateVal)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              selectedDate === dateItem.dateVal
+                ? "bg-[#3F51B5] text-white shadow-md"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {formatDisplayDate(dateItem.dateVal)}
+          </button>
+        ))}
+      </div>
+
+      {/* List View */}
+      {viewMode === "list" && (
+        <div className="space-y-4">
+          {(selectedDate
+            ? teacherSchedule.filter(s => s.dateVal === selectedDate)
+            : teacherSchedule
+          ).map((schedule,idx) => (
+            <div
+              key={idx}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <div className="p-5">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-medium">
+                        Group #{idx + 1}
+                      </span>
+                      <span
+                        className={`px-2 py-1 rounded-md text-xs font-medium ${
+                          new Date(schedule.dateVal) > new Date()
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {new Date(schedule.dateVal) > new Date()
+                          ? "Upcoming"
+                          : "Completed"}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-gray-800 text-lg">
+                      {schedule.groupUsername}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1 line-clamp-1">
+                      {schedule.projectTitle || "No project title"}
+                    </p>
+                    <div className="flex flex-wrap gap-4 mt-3">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">
+                          {new Date(`1970/01/01 ${schedule.startTime}`).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })} - 
+                          {new Date(`1970/01/01 ${schedule.endTime}`).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">{schedule.venue}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">{schedule.leaderEmail}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleViewGroupSchedule(schedule.groupId)}
+                      className="px-4 py-2 bg-[#3F51B5] text-white rounded-lg hover:bg-[#5C6BC0] transition-colors text-sm font-medium flex items-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Calendar View */}
+      {viewMode === "calendar" && (
+        <div className="space-y-6">
+          {uniqueDates.map((dateItem, dateIndex) => (
+            <div
+              key={dateIndex}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-[#1A237E] to-[#3F51B5] px-5 py-3">
+                <h3 className="text-white font-semibold">
+                  {formatDisplayDate(dateItem.dateVal)} ({dateItem.day})
+                </h3>
+                <p className="text-indigo-200 text-xs mt-0.5">
+                  {scheduleByDate[dateItem.dateKey]?.length || 0} presentations scheduled
+                </p>
+              </div>
+
+              <div className="divide-y divide-gray-100">
+                {scheduleByDate[dateItem.dateKey]?.map((schedule, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 text-center">
+                        <p className="text-sm font-medium text-gray-700">
+                          {new Date(`1970/01/01 ${schedule.startTime}`).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                        <p className="text-xs text-gray-400">to</p>
+                        <p className="text-sm font-medium text-gray-700">
+                          {new Date(`1970/01/01 ${schedule.endTime}`).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800">
+                          {schedule.groupUsername}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {schedule.projectTitle || "No project title"}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                            <MapPin className="w-3 h-3" />
+                            {schedule.venue}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                            <Users className="w-3 h-3" />
+                            Leader: {schedule.leaderEmail}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleViewGroupSchedule(schedule.groupId)}
+                        className="p-2 text-[#3F51B5] hover:bg-[#3F51B5]/10 rounded-lg transition-colors"
+                        title="View Group Details"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+  // Add this to your existing tabs in the return statement
+  {
+    activeTab === "schedule" && <TeacherScheduleTab />;
+  }
 
   // ============================================
   // Students Tab (Groups List)
@@ -910,6 +1396,7 @@ return (
         <div className="p-6">
           {activeTab === "overview" && <OverviewTab />}
           {activeTab === "students" && <StudentsTab />}
+          {activeTab === "schedule" && <TeacherScheduleTab />}
         </div>
       </div>
 

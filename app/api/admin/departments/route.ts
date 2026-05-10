@@ -17,7 +17,7 @@ export async function POST(req: NextRequest){
         const res = await executeQuery('INSERT INTO departments (name) values (?)',[deptName]);
         return NextResponse.json({
             success: true, 
-            message: 'Group approved successfully',
+            message: 'Department added successfully',
         })
     } catch (error) {
         return NextResponse.json({message: 'Error in adding department',error},{status: 500});

@@ -27,16 +27,17 @@ import {
   Briefcase,
   Target,
   FileText,
+  Calendar,
 } from "lucide-react";
 
 interface ModalGroupData extends StudentGroup {
-    members: Member[];
-    projectDetails?: {
-        PROJECTID?: number;
-        domains?: string;
-        PROJECTTITLE?: string;
-        PROPOSALDOCUMENT?: string;
-    };
+  members: Member[];
+  projectDetails?: {
+    PROJECTID?: number;
+    domains?: string;
+    PROJECTTITLE?: string;
+    PROPOSALDOCUMENT?: string;
+  };
 }
 
 interface Member {
@@ -334,6 +335,12 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [scheduling, setScheduling] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDates, setScheduleDates] = useState({
+    startDate: "",
+    endDate: "",
+  });
 
   // Data states
   const [pendingGroups, setPendingGroups] = useState<StudentGroup[]>([]);
@@ -343,15 +350,22 @@ export default function AdminDashboard() {
   const [students, setStudents] = useState<Student[]>([]);
 
   // Modal states
-  const [showGroupModal, setShowGroupModal] = useState<{ show: boolean; group: ModalGroupData | null }>({
+  const [showGroupModal, setShowGroupModal] = useState<{
+    show: boolean;
+    group: ModalGroupData | null;
+  }>({
     show: false,
     group: null,
-});
-const [rejectModal, setRejectModal] = useState<{ show: boolean; groupId: number | null; reason: string }>({
-  show: false,
-  groupId: null,
-  reason: ""
-});
+  });
+  const [rejectModal, setRejectModal] = useState<{
+    show: boolean;
+    groupId: number | null;
+    reason: string;
+  }>({
+    show: false,
+    groupId: null,
+    reason: "",
+  });
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [showCredentials, setShowCredentials] = useState<{
@@ -490,45 +504,47 @@ const [rejectModal, setRejectModal] = useState<{ show: boolean; groupId: number 
     }
   };
 
- const handleRejectGroup = (groupId: number) => {
-  setRejectModal({ show: true, groupId, reason: "" });
-};
+  const handleRejectGroup = (groupId: number) => {
+    setRejectModal({ show: true, groupId, reason: "" });
+  };
 
-const handleConfirmRejection = async () => {
-  const { groupId, reason } = rejectModal;
-  
-  if (!groupId) return;
-  
-  // Validate reason
-  if (!reason.trim()) {
-    alert("Please enter a reason for rejection.");
-    return;
-  }
-  
-  try {
-    const response = await fetch("/api/admin/reject-group", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupId, reason: reason.trim() }),
-    });
+  const handleConfirmRejection = async () => {
+    const { groupId, reason } = rejectModal;
 
-    if (response.ok) {
-      setRejectModal({ show: false, groupId: null, reason: "" });
-      fetchDashboardData();
-      alert("Group rejected successfully. Notification email sent to leader.");
-    } else {
-      const data = await response.json();
-      alert(data.message || "Failed to reject group");
+    if (!groupId) return;
+
+    // Validate reason
+    if (!reason.trim()) {
+      alert("Please enter a reason for rejection.");
+      return;
     }
-  } catch (error) {
-    console.error("Error rejecting group:", error);
-    alert("Network error. Please try again.");
-  }
-};
 
-const handleCancelRejection = () => {
-  setRejectModal({ show: false, groupId: null, reason: "" });
-};
+    try {
+      const response = await fetch("/api/admin/reject-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, reason: reason.trim() }),
+      });
+
+      if (response.ok) {
+        setRejectModal({ show: false, groupId: null, reason: "" });
+        fetchDashboardData();
+        alert(
+          "Group rejected successfully. Notification email sent to leader.",
+        );
+      } else {
+        const data = await response.json();
+        alert(data.message || "Failed to reject group");
+      }
+    } catch (error) {
+      console.error("Error rejecting group:", error);
+      alert("Network error. Please try again.");
+    }
+  };
+
+  const handleCancelRejection = () => {
+    setRejectModal({ show: false, groupId: null, reason: "" });
+  };
 
   // Generate random password
   const generateRandomPassword = () => {
@@ -542,43 +558,52 @@ const handleCancelRejection = () => {
   };
 
   // View Group Members
- const handleViewGroup = async (group: StudentGroup) => {
+  const handleViewGroup = async (group: StudentGroup) => {
     try {
-        // Fetch members
-        const membersRes = await fetch(`/api/student/group/members?groupId=${group.groupId}`);
-        const membersData = await membersRes.json();
-        const members = Array.isArray(membersData) ? membersData : [membersData];
-        
-        // Fetch project details
-        const projectRes = await fetch(`/api/student/group/project?groupId=${group.groupId}`);
-        const projectData = await projectRes.json();
-        const rawProject = Array.isArray(projectData) ? projectData[0] : projectData;
-        
-        // Map the project data to a consistent format
-        // ✅ Use undefined instead of null
-        const projectDetails = rawProject ? {
+      // Fetch members
+      const membersRes = await fetch(
+        `/api/student/group/members?groupId=${group.groupId}`,
+      );
+      const membersData = await membersRes.json();
+      const members = Array.isArray(membersData) ? membersData : [membersData];
+
+      // Fetch project details
+      const projectRes = await fetch(
+        `/api/student/group/project?groupId=${group.groupId}`,
+      );
+      const projectData = await projectRes.json();
+      const rawProject = Array.isArray(projectData)
+        ? projectData[0]
+        : projectData;
+
+      // Map the project data to a consistent format
+      // ✅ Use undefined instead of null
+      const projectDetails = rawProject
+        ? {
             PROJECTID: rawProject.PROJECTID || rawProject.projectId,
-            domains: rawProject.DOMAIN || rawProject.domains || rawProject.DOMAINS,
+            domains:
+              rawProject.DOMAIN || rawProject.domains || rawProject.DOMAINS,
             PROJECTTITLE: rawProject.PROJECTTITLE || rawProject.projectTitle,
-            PROPOSALDOCUMENT: rawProject.PROPOSALDOCUMENT || rawProject.proposalDocument
-        } : undefined;
-        
-        console.log("Project details mapped:", projectDetails);
-        
-        // Combine group data with members and project details
-        const fullGroupData = {
-            ...group,
-            members: members,
-            projectDetails: projectDetails
-        };
-        
-        console.log("Full group data:", fullGroupData);
-        setShowGroupModal({ show: true, group: fullGroupData });
-        
+            PROPOSALDOCUMENT:
+              rawProject.PROPOSALDOCUMENT || rawProject.proposalDocument,
+          }
+        : undefined;
+
+      console.log("Project details mapped:", projectDetails);
+
+      // Combine group data with members and project details
+      const fullGroupData = {
+        ...group,
+        members: members,
+        projectDetails: projectDetails,
+      };
+
+      console.log("Full group data:", fullGroupData);
+      setShowGroupModal({ show: true, group: fullGroupData });
     } catch (error) {
-        console.error("Error fetching group details:", error);
+      console.error("Error fetching group details:", error);
     }
-};
+  };
 
   const handleAssignJury = async (groupId: number) => {
     try {
@@ -630,6 +655,54 @@ const handleCancelRejection = () => {
     } catch (error) {
       console.error("Network error:", error);
     }
+  };
+
+  // Add this state to your admin dashboard component
+
+  // Updated handleAutoSchedule - now receives dates as parameters
+  const handleAutoSchedule = async (startDate: string, endDate: string) => {
+    setScheduling(true);
+    try {
+      const response = await fetch("/api/admin/auto-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate: startDate,
+          endDate: endDate,
+          startTime: "08:00:00",
+        endTime: "16:00:00",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(
+          `✅ Scheduling Complete!\n\nScheduled: ${data.summary?.assignedCount || 0}\nFailed: ${data.summary?.unassignedCount || 0}`,
+        );
+        fetchDashboardData();
+        setShowScheduleModal(false);
+        setScheduleDates({ startDate: "", endDate: "" });
+      } else {
+        alert("Scheduling failed: " + data.message);
+      }
+    } catch (error) {
+      console.error("Scheduling error:", error);
+      alert("Network error during scheduling");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  // Open modal
+  const openScheduleModal = () => {
+    setShowScheduleModal(true);
+  };
+
+  // Close modal
+  const closeScheduleModal = () => {
+    setShowScheduleModal(false);
+    setScheduleDates({ startDate: "", endDate: "" });
   };
 
   // ============================================
@@ -763,66 +836,82 @@ const handleCancelRejection = () => {
   // Verified Groups Tab
   // ============================================
   const VerifiedGroupsTab = () => (
-    <div className="space-y-4">
-      {verifiedGroups.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-800">
-            No Verified Groups
-          </h3>
-          <p className="text-gray-500">No groups have been verified yet.</p>
-        </div>
-      ) : (
-        verifiedGroups.map((group) => (
-          <div
-            key={group.groupId}
-            className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-          >
-            <div className="p-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                {/* Left side - Group Info */}
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-800 text-lg">
-                    {group.groupUsername}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Leader: {group.leaderEmail}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Supervisor: {group.supervisorEmail}
-                  </p>
-                  <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+  <div className="space-y-4">
+    {verifiedGroups.length === 0 ? (
+      <div className="bg-white rounded-lg shadow p-8 text-center">
+        <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+        <h3 className="text-lg font-medium text-gray-800">
+          No Verified Groups
+        </h3>
+        <p className="text-gray-500">No groups have been verified yet.</p>
+      </div>
+    ) : (
+      verifiedGroups.map((group) => (
+        <div
+          key={group.groupId}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+        >
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              {/* Left side - Group Info */}
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-800 text-lg">
+                  {group.groupUsername}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Leader: {group.leaderEmail}
+                </p>
+                <p className="text-sm text-gray-500">
+                  Supervisor: {group.supervisorEmail}
+                </p>
+                <div className="flex items-center gap-3 mt-2">
+                  <p className="text-sm text-green-600 flex items-center gap-1">
                     <CheckCircle className="w-4 h-4" />
                     Verified
                   </p>
-                </div>
-
-                {/* Right side - Buttons */}
-                <div className="flex gap-3">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleViewGroup(group)}
-                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium shadow-sm"
-                    >
-                      View Details
-                    </button>
-                    <button
-                      onClick={() => handleAssignJury(group.groupId)}
-                      style={{ backgroundColor: "#da627d" }}
-                      className="px-4 py-2 bg-rose-400 text-white rounded-lg hover:bg-rose-500 transition-colors text-sm font-medium flex items-center gap-2 shadow-sm"
-                    >
+                  {/* Show jury status */}
+                  {group.juryId ? (
+                    <p className="text-sm text-purple-600 flex items-center gap-1">
                       <UserCheck className="w-4 h-4" />
-                      Assign Jury
-                    </button>
-                  </div>
+                      Jury Assigned
+                    </p>
+                  ) : (
+                    <p className="text-sm text-orange-500 flex items-center gap-1">
+                      <AlertCircle className="w-4 h-4" />
+                      Pending Jury
+                    </p>
+                  )}
                 </div>
+              </div>
+
+              {/* Right side - Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleViewGroup(group)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium shadow-sm"
+                >
+                  View Details
+                </button>
+                
+                {/* ✅ Only show Assign Jury button if no jury is assigned */}
+                {!group.juryId && (
+                  <button
+                    onClick={() => handleAssignJury(group.groupId)}
+                    style={{ backgroundColor: "#da627d" }}
+                    className="px-4 py-2 bg-rose-400 text-white rounded-lg hover:bg-rose-500 transition-colors text-sm font-medium flex items-center gap-2 shadow-sm"
+                  >
+                    <UserCheck className="w-4 h-4" />
+                    Assign Jury
+                  </button>
+                )}
               </div>
             </div>
           </div>
-        ))
-      )}
-    </div>
-  );
+        </div>
+      ))
+    )}
+  </div>
+);
 
   // ============================================
   // Departments Tab
@@ -905,9 +994,11 @@ const handleCancelRejection = () => {
                 <td className="p-4">{teacher.TeacherId}</td>
                 <td className="p-4 font-medium">{teacher.name}</td>
                 <td className="p-4 text-gray-500">{teacher.email}</td>
-                <td className="p-4">{departments.map((dept)=>{
-                  return dept.deptId === teacher.deptId ? dept.name : ''
-                })}</td>
+                <td className="p-4">
+                  {departments.map((dept) => {
+                    return dept.deptId === teacher.deptId ? dept.name : "";
+                  })}
+                </td>
                 <td className="p-4">{teacher.specialization}</td>
               </tr>
             ))
@@ -963,23 +1054,35 @@ const handleCancelRejection = () => {
   // ============================================
   // Add Department Handler
   // ============================================
-  const handleAddDepartment = async () => {
-    try {
-      const response = await fetch("/api/admin/departments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: departmentForm.name }),
-      });
+ // ✅ CORRECT - Accept the name parameter from the modal
+const handleAddDepartment = async (deptName: string) => {
+  console.log("Adding department with name:", deptName);
+  
+  if (!deptName || deptName.trim() === "") {
+    alert("Department name cannot be empty");
+    return;
+  }
+  
+  try {
+    const response = await fetch("/api/admin/departments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: deptName.trim() }),
+    });
 
-      if (response.ok) {
-        fetchDashboardData();
-        setShowDepartmentModal(false);
-        setDepartmentForm({ name: "" });
-      }
-    } catch (error) {
-      console.error("Error adding department:", error);
+    if (response.ok) {
+      fetchDashboardData();
+      setShowDepartmentModal(false);
+      setDepartmentForm({ name: "" });
+    } else {
+      const data = await response.json();
+      alert(data.message || "Failed to add department");
     }
-  };
+  } catch (error) {
+    console.error("Error adding department:", error);
+    alert("Network error");
+  }
+};
 
   const deleteDepartment = async (id: Number) => {
     try {
@@ -1059,345 +1162,576 @@ const handleCancelRejection = () => {
     </div>
   );
 
- // ============================================
-// Modern Rejection Modal
-// ============================================
-const RejectionModal = () => (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-      {/* Modal Header */}
-      <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-            <XCircle className="w-4 h-4 text-red-600" />
+  // ============================================
+  // Modern Rejection Modal
+  // ============================================
+  const RejectionModal = () => (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        {/* Modal Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <XCircle className="w-4 h-4 text-red-600" />
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">
+              Reject Group
+            </h3>
           </div>
-          <h3 className="text-md font-semibold text-gray-800">Reject Group</h3>
+          <button
+            onClick={handleCancelRejection}
+            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
         </div>
-        <button 
-          onClick={handleCancelRejection}
-          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-400" />
-        </button>
-      </div>
-      
-      {/* Modal Body */}
-      <div className="p-5 space-y-4">
-        {/* Warning Banner */}
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <p className="text-xs text-red-700">
-            ⚠️ This action cannot be undone. The group leader will be notified via email.
-          </p>
-        </div>
-        
-        {/* Reason Input */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Reason for Rejection *
-          </label>
-          <input
-            value={rejectModal.reason}
-            onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
-            
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-gray-700"
-            placeholder="Please provide a clear reason for rejection..."
-            autoFocus
-            dir="ltr"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            This reason will be sent to the group leader's email.
-          </p>
-        </div>
-        
-        {/* Quick Suggestions */}
-        <div>
-          <p className="text-xs text-gray-500 mb-2">Quick suggestions:</p>
-          <div className="flex flex-wrap gap-2">
-            {[
-              "Insufficient group members",
-              "Invalid email format",
-              "Project domain mismatch",
-              "Incomplete application",
-              "Supervisor not available",
-              "Duplicate registration"
-            ].map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => setRejectModal(prev => ({ ...prev, reason: suggestion }))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-              >
-                {suggestion}
-              </button>
-            ))}
+
+        {/* Modal Body */}
+        <div className="p-5 space-y-4">
+          {/* Warning Banner */}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-xs text-red-700">
+              ⚠️ This action cannot be undone. The group leader will be notified
+              via email.
+            </p>
+          </div>
+
+          {/* Reason Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason for Rejection *
+            </label>
+            <input
+              value={rejectModal.reason}
+              onChange={(e) =>
+                setRejectModal((prev) => ({ ...prev, reason: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-gray-700"
+              placeholder="Please provide a clear reason for rejection..."
+              autoFocus
+              dir="ltr"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This reason will be sent to the group leader's email.
+            </p>
+          </div>
+
+          {/* Quick Suggestions */}
+          <div>
+            <p className="text-xs text-gray-500 mb-2">Quick suggestions:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "Insufficient group members",
+                "Invalid email format",
+                "Project domain mismatch",
+                "Incomplete application",
+                "Supervisor not available",
+                "Duplicate registration",
+              ].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() =>
+                    setRejectModal((prev) => ({ ...prev, reason: suggestion }))
+                  }
+                  className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-      
-      {/* Modal Footer */}
-      <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-        <button
-          onClick={handleCancelRejection}
-          className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleConfirmRejection}
-          disabled={!rejectModal.reason.trim()}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <XCircle className="w-3.5 h-3.5" />
-          Confirm Rejection
-        </button>
+
+        {/* Modal Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            onClick={handleCancelRejection}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirmRejection}
+            disabled={!rejectModal.reason.trim()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Confirm Rejection
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
   // ============================================
   // View Group Modal
   // ============================================
-const ViewGroupModal = () => {
+  const ViewGroupModal = () => {
     const groupData = showGroupModal.group;
-    
+
     if (!groupData) return null;
-    
+
     // Get project details from the combined data
     const project = groupData.projectDetails;
-    
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-                {/* Modal Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex justify-between items-center">
-                    <div>
-                        <h3 className="text-2xl font-bold text-gray-800">Group Details</h3>
-                        <p className="text-sm text-gray-500 mt-1">Complete information about the group and its members</p>
-                    </div>
-                    <button 
-                        onClick={() => setShowGroupModal({ show: false, group: null })}
-                        className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-                    >
-                        <X className="w-6 h-6 text-gray-400" />
-                    </button>
-                </div>
-                
-                {/* Modal Body */}
-                <div className="px-8 py-8 space-y-8">
-                    {/* Group Information Section */}
-                    <div>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                                <Users className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-semibold text-gray-800">Group Information</h4>
-                                <p className="text-sm text-gray-500">Basic group details and project information</p>
-                            </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 rounded-2xl p-6">
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Group Username</p>
-                                <p className="text-base font-semibold text-gray-900">{groupData.groupUsername}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Leader Email</p>
-                                <p className="text-base text-gray-800 break-all">{groupData.leaderEmail}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Supervisor</p>
-                                <p className="text-base text-gray-800">{groupData.supervisorEmail || 'Not Assigned'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Project Details Section - Using fetched project data */}
-                   {/* Project Details Section */}
-{groupData.projectDetails && (
-    <div>
-        <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-purple-600" />
-            </div>
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex justify-between items-center">
             <div>
-                <h4 className="text-lg font-semibold text-gray-800">Project Details</h4>
-                <p className="text-sm text-gray-500">Project information and domains</p>
+              <h3 className="text-2xl font-bold text-gray-800">
+                Group Details
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Complete information about the group and its members
+              </p>
             </div>
-        </div>
-        
-        <div className="space-y-6 bg-gray-50 rounded-2xl p-6">
-            <div className="grid grid-cols-1 gap-4">
-                {/* Project Title */}
-                <div className="space-y-1">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Project Title</p>
-                    <p className="text-base font-semibold text-gray-900">
-                        {groupData.projectDetails.PROJECTTITLE || 'Not Submitted'}
-                    </p>
+            <button
+              onClick={() => setShowGroupModal({ show: false, group: null })}
+              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-400" />
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div className="px-8 py-8 space-y-8">
+            {/* Group Information Section */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
                 </div>
-                
-                {/* Domains */}
-                <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Domains</p>
-                    <div className="flex flex-wrap gap-2">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-800">
+                    Group Information
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    Basic group details and project information
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 rounded-2xl p-6">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Group Username
+                  </p>
+                  <p className="text-base font-semibold text-gray-900">
+                    {groupData.groupUsername}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Leader Email
+                  </p>
+                  <p className="text-base text-gray-800 break-all">
+                    {groupData.leaderEmail}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Supervisor
+                  </p>
+                  <p className="text-base text-gray-800">
+                    {groupData.supervisorEmail || "Not Assigned"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Project Details Section - Using fetched project data */}
+            {/* Project Details Section */}
+            {groupData.projectDetails && (
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800">
+                      Project Details
+                    </h4>
+                    <p className="text-sm text-gray-500">
+                      Project information and domains
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-6 bg-gray-50 rounded-2xl p-6">
+                  <div className="grid grid-cols-1 gap-4">
+                    {/* Project Title */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Project Title
+                      </p>
+                      <p className="text-base font-semibold text-gray-900">
+                        {groupData.projectDetails.PROJECTTITLE ||
+                          "Not Submitted"}
+                      </p>
+                    </div>
+
+                    {/* Domains */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Domains
+                      </p>
+                      <div className="flex flex-wrap gap-2">
                         {groupData.projectDetails.domains ? (
-                            groupData.projectDetails.domains.split(',').map((domain: string, idx: number) => (
-                                <span key={idx} className="px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm border border-gray-200">
-                                    {domain.trim()}
-                                </span>
+                          groupData.projectDetails.domains
+                            .split(",")
+                            .map((domain: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm border border-gray-200"
+                              >
+                                {domain.trim()}
+                              </span>
                             ))
                         ) : (
-                            <p className="text-gray-600">No domains selected</p>
+                          <p className="text-gray-600">No domains selected</p>
                         )}
+                      </div>
                     </div>
-                </div>
-                
-                {/* Proposal Document */}
-                {groupData.projectDetails.PROPOSALDOCUMENT && (
-                    <div className="space-y-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Proposal Document</p>
-                        <a 
-                            href={groupData.projectDetails.PROPOSALDOCUMENT} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1"
+
+                    {/* Proposal Document */}
+                    {groupData.projectDetails.PROPOSALDOCUMENT && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                          Proposal Document
+                        </p>
+                        <a
+                          href={groupData.projectDetails.PROPOSALDOCUMENT}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1"
                         >
-                            <FileText className="w-4 h-4" />
-                            View Proposal
+                          <FileText className="w-4 h-4" />
+                          View Proposal
                         </a>
-                    </div>
-                )}
-            </div>
-        </div>
-    </div>
-)}
-                    
-                    {/* Status Section */}
-                    <div>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                                <CheckCircle className="w-5 h-5 text-emerald-600" />
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-semibold text-gray-800">Status</h4>
-                                <p className="text-sm text-gray-500">Current verification status</p>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-gray-50 rounded-2xl p-6">
-                            <div className="flex flex-wrap items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-3 h-3 rounded-full ${
-                                        groupData.status === 'VERIFIED' ? 'bg-green-500' :
-                                        groupData.status === 'PENDING' ? 'bg-yellow-500' : 'bg-red-500'
-                                    }`}></div>
-                                    <span className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
-                                        groupData.status === 'VERIFIED' ? 'bg-green-100 text-green-700' :
-                                        groupData.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                                    }`}>
-                                        {groupData.status === 'VERIFIED' ? 'VERIFIED' : 
-                                         groupData.status === 'PENDING' ? 'PENDING APPROVAL' : 'DENIED'}
-                                    </span>
-                                </div>
-                                {groupData.juryId && (
-                                    <div className="flex items-center gap-2">
-                                        <UserCheck className="w-4 h-4 text-purple-500" />
-                                        <span className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
-                                            JURY ASSIGNED
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Members Section */}
-                    <div>
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                                <Users className="w-5 h-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-semibold text-gray-800">Group Members</h4>
-                                <p className="text-sm text-gray-500">Team members with their details</p>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-gray-50 rounded-2xl overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="bg-gray-100">
-                                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">#</th>
-                                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Full Name</th>
-                                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Email</th>
-                                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Section</th>
-                                            <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">Batch</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {groupData.members && groupData.members.length > 0 ? (
-                                            groupData.members.map((member: any, idx: number) => (
-                                                <tr key={idx} className="border-t border-gray-200 hover:bg-white transition-colors">
-                                                    <td className="px-6 py-4 text-gray-500 font-medium">{idx + 1}</td>
-                                                    <td className="px-6 py-4 font-semibold text-gray-800">{member.name}</td>
-                                                    <td className="px-6 py-4 text-gray-600 break-all">{member.email}</td>
-                                                    <td className="px-6 py-4 text-gray-600">{member.section || '-'}</td>
-                                                    <td className="px-6 py-4 text-gray-600">{member.batch || '-'}</td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={5} className="text-center py-16">
-                                                    <div className="flex flex-col items-center gap-3">
-                                                        <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center">
-                                                            <Users className="w-8 h-8 text-gray-400" />
-                                                        </div>
-                                                        <p className="text-gray-500 font-medium">No members found</p>
-                                                        <p className="text-sm text-gray-400">This group has no members assigned</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                {/* Modal Footer */}
-                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-6 flex justify-end gap-4">
-                    <button
-                        onClick={() => setShowGroupModal({ show: false, group: null })}
-                        className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-semibold"
-                    >
-                        Close
-                    </button>
-                    {groupData.status === 'PENDING' && (
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => handleApproveGroup(groupData)}
-                                className="px-6 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-semibold flex items-center gap-2"
-                            >
-                                <CheckCircle className="w-4 h-4" />
-                                Approve Group
-                            </button>
-                            <button
-                                onClick={() => handleRejectGroup(groupData.groupId)}
-                                className="px-6 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm font-semibold flex items-center gap-2"
-                            >
-                                <XCircle className="w-4 h-4" />
-                                Reject Group
-                            </button>
-                        </div>
+                      </div>
                     )}
+                  </div>
                 </div>
+              </div>
+            )}
+
+            {/* Status Section */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-800">
+                    Status
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    Current verification status
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-2xl p-6">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        groupData.status === "VERIFIED"
+                          ? "bg-green-500"
+                          : groupData.status === "PENDING"
+                            ? "bg-yellow-500"
+                            : "bg-red-500"
+                      }`}
+                    ></div>
+                    <span
+                      className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
+                        groupData.status === "VERIFIED"
+                          ? "bg-green-100 text-green-700"
+                          : groupData.status === "PENDING"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {groupData.status === "VERIFIED"
+                        ? "VERIFIED"
+                        : groupData.status === "PENDING"
+                          ? "PENDING APPROVAL"
+                          : "DENIED"}
+                    </span>
+                  </div>
+                  {groupData.juryId && (
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-purple-500" />
+                      <span className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
+                        JURY ASSIGNED
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Members Section */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-800">
+                    Group Members
+                  </h4>
+                  <p className="text-sm text-gray-500">
+                    Team members with their details
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                          #
+                        </th>
+                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                          Full Name
+                        </th>
+                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                          Email
+                        </th>
+                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                          Section
+                        </th>
+                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                          Batch
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupData.members && groupData.members.length > 0 ? (
+                        groupData.members.map((member: any, idx: number) => (
+                          <tr
+                            key={idx}
+                            className="border-t border-gray-200 hover:bg-white transition-colors"
+                          >
+                            <td className="px-6 py-4 text-gray-500 font-medium">
+                              {idx + 1}
+                            </td>
+                            <td className="px-6 py-4 font-semibold text-gray-800">
+                              {member.name}
+                            </td>
+                            <td className="px-6 py-4 text-gray-600 break-all">
+                              {member.email}
+                            </td>
+                            <td className="px-6 py-4 text-gray-600">
+                              {member.section || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-gray-600">
+                              {member.batch || "-"}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="text-center py-16">
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center">
+                                <Users className="w-8 h-8 text-gray-400" />
+                              </div>
+                              <p className="text-gray-500 font-medium">
+                                No members found
+                              </p>
+                              <p className="text-sm text-gray-400">
+                                This group has no members assigned
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-6 flex justify-end gap-4">
+            <button
+              onClick={() => setShowGroupModal({ show: false, group: null })}
+              className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-semibold"
+            >
+              Close
+            </button>
+            {groupData.status === "PENDING" && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleApproveGroup(groupData)}
+                  className="px-6 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-semibold flex items-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve Group
+                </button>
+                <button
+                  onClick={() => handleRejectGroup(groupData.groupId)}
+                  className="px-6 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm font-semibold flex items-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Reject Group
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
     );
-};
+  };
+
+  // Schedule Date Selection Modal
+  const ScheduleDateModal = () => (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        {/* Modal Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-green-600" />
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">
+              Schedule Evaluation
+            </h3>
+          </div>
+          <button
+            onClick={closeScheduleModal}
+            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-400" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-5 space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-700">
+              📅 Select the date range for the evaluation schedule. All verified
+              groups will be automatically assigned to available time slots and
+              venues.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={scheduleDates.startDate}
+              onChange={(e) =>
+                setScheduleDates((prev) => ({
+                  ...prev,
+                  startDate: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              min={new Date().toISOString().split("T")[0]}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={scheduleDates.endDate}
+              onChange={(e) =>
+                setScheduleDates((prev) => ({
+                  ...prev,
+                  endDate: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              min={
+                scheduleDates.startDate ||
+                new Date().toISOString().split("T")[0]
+              }
+              required
+            />
+          </div>
+
+          {/* Date range summary */}
+          {scheduleDates.startDate && scheduleDates.endDate && (
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-gray-600">
+                📊 <span className="font-medium">Range Summary:</span>
+                <br />
+                From: {new Date(scheduleDates.startDate).toLocaleDateString()}
+                <br />
+                To: {new Date(scheduleDates.endDate).toLocaleDateString()}
+                <br />
+                Duration:{" "}
+                {Math.ceil(
+                  (new Date(scheduleDates.endDate).getTime() -
+                    new Date(scheduleDates.startDate).getTime()) /
+                    (1000 * 60 * 60 * 24),
+                ) + 1}{" "}
+                days
+              </p>
+            </div>
+          )}
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-xs text-yellow-700">
+              ⚠️ <span className="font-medium">Note:</span>
+              <br />
+              • This will schedule all verified groups without existing
+              schedules
+              <br />
+              • Time slots: 8:00 AM - 4:00 PM (50 min each)
+              <br />• Conflicts will be automatically handled
+            </p>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button
+            onClick={closeScheduleModal}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() =>
+              handleAutoSchedule(scheduleDates.startDate, scheduleDates.endDate)
+            }
+            disabled={
+              !scheduleDates.startDate || !scheduleDates.endDate || scheduling
+            }
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {scheduling ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Scheduling...</span>
+              </>
+            ) : (
+              <>
+                <Calendar className="w-4 h-4" />
+                <span>Create Schedule</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   // ============================================
   // Credentials Modal
@@ -1508,6 +1842,16 @@ const ViewGroupModal = () => {
                 Add {activeTab === "departments" ? "Department" : "Teacher"}
               </button>
             )}
+            {activeTab === "verified" && (
+              <button
+                onClick={openScheduleModal}
+                disabled={scheduling}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                {scheduling ? "Scheduling..." : "Create Schedule"}
+              </button>
+            )}
 
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -1579,7 +1923,8 @@ const ViewGroupModal = () => {
       {showCredentials.show && <CredentialsModal />}
       {/* View Group Modal */}
       {showGroupModal.show && <ViewGroupModal />}
-      {rejectModal.show && <RejectionModal/>}
+      {rejectModal.show && <RejectionModal />}
+      {showScheduleModal && <ScheduleDateModal />}
     </div>
   );
 }

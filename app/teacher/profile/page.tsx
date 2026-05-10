@@ -226,7 +226,7 @@ export default function TeacherProfilePage() {
           </h2>
           <p className="text-gray-500 mt-2">Unable to load your profile.</p>
           <Link
-            href="/teacher"
+            href="/teacher/dashboard"
             className="mt-4 inline-block text-[#3F51B5] hover:underline"
           >
             Back to Dashboard
@@ -242,7 +242,7 @@ export default function TeacherProfilePage() {
         {/* Header */}
         <div className="mb-8">
           <Link
-            href="/teacher"
+            href="/teacher/dashboard"
             className="inline-flex items-center gap-2 text-gray-500 hover:text-[#3F51B5] transition-colors mb-4"
           >
             <ArrowLeft className="w-4 h-4" />

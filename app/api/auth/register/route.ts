@@ -1,10 +1,10 @@
 import { getCloudinaryInstance } from "@/app/lib/cloudinary";
-import { executeQuery } from "@/app/lib/db.server";
-import { mkdir, writeFile } from "fs/promises";
+import { executeQuery, getConnection } from "@/app/lib/db.server";
 import { NextRequest, NextResponse } from "next/server";
-import path from "path";
 
 export async function POST(req: NextRequest) {
+  let connection;
+  
   try {
     // Get the form details
     const formData = await req.formData();
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const leaderEmail = formData.get("leaderEmail") as string;
     const membersJson = formData.get("members") as string;
     const deptName = formData.get("deptName") as string;
-    const domainJson = formData.get("domain") as string; // JSON array of domains
+    const domainJson = formData.get("domain") as string;
     const document = formData.get("document") as File;
     const projectTitle = formData.get("projectTitle") as string;
     const supervisorEmail = formData.get("supervisorEmail") as string;
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     // Parse members and domains
     const members = JSON.parse(membersJson);
-    const domains = JSON.parse(domainJson); // Array of domain strings
+    const domains = JSON.parse(domainJson);
 
     if (!members || members.length < 2) {
       return NextResponse.json(
@@ -78,18 +78,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Insert group as pending
-    const insertQuery = `INSERT INTO studentgroup (groupusername, leaderemail, supervisorEmail, status) VALUES (?, ?, ?, 'PENDING')`;
-    const response = await executeQuery(insertQuery, [
-      groupUsername,
-      leaderEmail,
-      supervisorEmail,
-    ]);
-
-    // Get the new group ID
-    const newGroupId = (response as any).insertId;
-
-    // 4. Add members into students table
+    // 3. Get department ID
     console.log("Looking for department name:", deptName);
     const deptResult = await executeQuery(
       "SELECT DEPTID FROM departments WHERE NAME = ?",
@@ -106,37 +95,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    for (const member of members) {
-      // Extract batch from roll number (k213094 → 2021)
-      const match = member.rollNo?.match(/k(\d{2})\d{4}/i);
-      let memberBatch = new Date().getFullYear();
-
-      if (match) {
-        const year = parseInt(match[1]);
-        memberBatch = 2000 + year;
-      }
-
-      const addMemQuery = `INSERT INTO students (GROUPID, EMAIL, NAME, SECTION, BATCH, DEPTID) 
-                           VALUES (?, ?, ?, ?, ?, ?)`;
-
-      await executeQuery(addMemQuery, [
-        newGroupId,
-        member.email,
-        member.name,
-        member.section,
-        memberBatch,
-        deptId,
-      ]);
-    }
-
-    // 5. Save proposal document - Upload to Cloudinary
-    // 5. Save proposal document - Upload to Cloudinary
+    // 4. Upload document to Cloudinary (BEFORE transaction)
     let documentUrl = null;
     if (document) {
       try {
-        // Get a newly configured instance right before using it
         const cloudinary = getCloudinaryInstance();
-
         const buffer = Buffer.from(await document.arrayBuffer());
         const base64String = buffer.toString("base64");
         const dataUri = `data:${document.type};base64,${base64String}`;
@@ -153,36 +116,65 @@ export async function POST(req: NextRequest) {
       } catch (uploadError) {
         console.error("Cloudinary upload error:", uploadError);
       }
-    } else {
-      console.log("No document file provided");
     }
 
-    console.log("Final documentUrl:", documentUrl);
+    // ============================================
+    // START TRANSACTION
+    // ============================================
+    connection = await getConnection();
+    await connection.beginTransaction();
+    
+    console.log("=== STARTING DATABASE TRANSACTION ===");
 
-    // 6. Generate new Project ID FIRST (before the loop)
-    const nextIdResult = await executeQuery(
-      "SELECT IFNULL(MAX(PROJECTID), 0) + 1 as nextId FROM project",
+    // 5. Insert group as pending
+    const [groupResult] = await connection.execute(
+      `INSERT INTO studentgroup (groupusername, leaderemail, supervisorEmail, status) 
+       VALUES (?, ?, ?, 'PENDING')`,
+      [groupUsername, leaderEmail, supervisorEmail]
+    );
+
+    const newGroupId = (groupResult as any).insertId;
+    console.log(`✅ Group inserted with ID: ${newGroupId}`);
+
+    // 6. Insert members
+    for (const member of members) {
+      const match = member.rollNo?.match(/k(\d{2})\d{4}/i);
+      let memberBatch = new Date().getFullYear();
+
+      if (match) {
+        const year = parseInt(match[1]);
+        memberBatch = 2000 + year;
+      }
+
+      await connection.execute(
+        `INSERT INTO students (groupId, email, name, section, batch, deptId) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [newGroupId, member.email, member.name, member.section, memberBatch, deptId]
+      );
+    }
+    console.log(`✅ ${members.length} members inserted`);
+
+    // 7. Generate new Project ID
+    const [nextIdResult] = await connection.execute(
+      "SELECT IFNULL(MAX(PROJECTID), 0) + 1 as nextId FROM project"
     );
     const newProjectId = (nextIdResult as any[])[0]?.nextId;
 
-    // 7. Insert project details - ONE ROW PER DOMAIN
+    // 8. Insert project details (one row per domain)
     for (const domainName of domains) {
-      const projectQuery = `
-        INSERT INTO project (PROJECTID, DOMAIN, GROUPID, PROPOSALDOCUMENT, PROJECTTITLE) 
-        VALUES (?, ?, ?, ?, ?)
-    `;
-      await executeQuery(projectQuery, [
-        newProjectId,
-        domainName.trim(),
-        newGroupId,
-        documentUrl, // This will be null if upload failed, or URL if succeeded
-        projectTitle,
-      ]);
+      await connection.execute(
+        `INSERT INTO project (PROJECTID, DOMAIN, GROUPID, PROPOSALDOCUMENT, PROJECTTITLE) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [newProjectId, domainName.trim(), newGroupId, documentUrl, projectTitle]
+      );
     }
-    console.log(
-      `Inserted ${domains.length} project rows for ProjectID: ${newProjectId}`,
-    );
-    // ✅ Send success response
+    console.log(`✅ ${domains.length} project rows inserted for ProjectID: ${newProjectId}`);
+
+    // 9. Commit transaction
+    await connection.commit();
+    console.log("✅ TRANSACTION COMMITTED - All data saved");
+
+    // Send success response
     return NextResponse.json(
       {
         success: true,
@@ -194,11 +186,20 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 },
     );
+    
   } catch (error) {
+    // Rollback transaction on error
+    if (connection) {
+      await connection.rollback();
+      console.error("❌ TRANSACTION ROLLED BACK - No changes saved");
+    }
     console.error("Registration error:", error);
     return NextResponse.json(
       { message: "Internal server error: " + (error as Error).message },
       { status: 500 },
     );
+  } finally {
+    // Release connection back to pool
+    if (connection) connection.release();
   }
 }

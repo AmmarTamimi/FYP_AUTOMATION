@@ -70,7 +70,10 @@ interface Schedule {
   scheduleId: number;
   day: string;
   date: string;
-  time: string;
+  startTime: string;
+  endTime: string;
+  juniorName: string;
+  seniorName: string;
   venue: string;
   venueCapacity: number;
 }
@@ -172,48 +175,64 @@ const fetchGroupData = async () => {
     const groupData = await groupRes.json();
     console.log("Group data received:", groupData);
     
-    // IMPORTANT: Set group data first
-    setGroup(groupData[0]);
+    const currentGroup = groupData[0];
+    setGroup(currentGroup);
     
     let memberCount = 0;
+    let scheduleExists = false;
+    let scheduleData = null;
+    
     // Fetch group members
-    if (groupData[0].groupId) {
-      console.log("Fetching members for groupId:", groupData[0].groupId);
-      const membersRes = await fetch(`/api/student/group/members?groupId=${groupData[0].groupId}`);
+    if (currentGroup.groupId) {
+      console.log("Fetching members for groupId:", currentGroup.groupId);
+      const membersRes = await fetch(`/api/student/group/members?groupId=${currentGroup.groupId}`);
       if (membersRes.ok) {
         const membersData = await membersRes.json();
         memberCount = membersData.length;
         console.log("Members data received:", membersData);
         setMembers(membersData);
-        
-        // Update stats
-        
       } else {
         console.error("Members API error:", membersRes.status);
       }
 
-      if(groupData[0].juryId){
-        const juryRes = await fetch(`/api/student/group/jury?juryId=${groupData[0].juryId}`);
-        if (juryRes.ok){
+      // Fetch jury details
+      if (currentGroup.juryId) {
+        const juryRes = await fetch(`/api/student/group/jury?juryId=${currentGroup.juryId}`);
+        if (juryRes.ok) {
           const juryDetails = await juryRes.json();
           setJury(juryDetails[0]);
-          console.log("jury detais fetched : ",juryDetails);
+          console.log("Jury details fetched:", juryDetails);
         }
+      }
+      
+      // ✅ Fetch schedule for this group
+      console.log("Fetching schedule for groupId:", currentGroup.groupId);
+      const scheduleRes = await fetch(`/api/student/group/schedule?groupId=${currentGroup.groupId}`);
+      console.log("schedule result",scheduleRes);
+      if (scheduleRes.ok) {
+        scheduleData = await scheduleRes.json();
+        console.log("Schedule data received:", scheduleData);
+        if (scheduleData && scheduleData.length > 0) {
+          setSchedule(scheduleData[0]);
+          scheduleExists = true;
+        }
+      } else {
+        console.log("No schedule found for this group");
       }
     }
 
-    //fetch project details
-    const projectRes = await fetch(`/api/student/group/project?groupId=${groupData[0].groupId}`);
-    if(projectRes.ok){
+    // Fetch project details
+    const projectRes = await fetch(`/api/student/group/project?groupId=${currentGroup.groupId}`);
+    if (projectRes.ok) {
       const projectDetails = await projectRes.json();
-      console.log("project Data: ",projectDetails);
+      console.log("Project Data: ", projectDetails);
       setproject(projectDetails[0]);
       setStats({
-          membersCount: memberCount,
-          projectSubmitted: !!projectDetails[0].PROPOSALDOCUMENT,
-          juryAssigned: !!groupData[0].juryId,
-          scheduleConfirmed: false
-        });
+        membersCount: memberCount,
+        projectSubmitted: !!projectDetails[0]?.PROPOSALDOCUMENT,
+        juryAssigned: !!currentGroup.juryId,
+        scheduleConfirmed: scheduleExists
+      });
     }
     
   } catch (error) {
@@ -222,6 +241,27 @@ const fetchGroupData = async () => {
     console.log("Setting loading to false");
     setLoading(false);
   }
+};
+
+// Helper function to format date
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const day = date.getDate();
+  const month = date.toLocaleString('default', { month: 'long' });
+  const year = date.getFullYear();
+  
+  // Add ordinal suffix to day (1st, 2nd, 3rd, 4th, etc.)
+  const getOrdinalSuffix = (day: number) => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+  
+  return `${day}${getOrdinalSuffix(day)} ${month} ${year}`;
 };
 
   const handleUploadDocument = async () => {
@@ -409,12 +449,12 @@ const OverviewTab = () => {
       <div className="bg-gradient-to-r from-[#1A237E] via-[#283593] to-[#3F51B5] rounded-xl p-6 shadow-lg">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-800 mb-1">Welcome back, {user?.name || group.groupUsername}!</h2>
+            <h2 className="text-2xl font-bold text-white mb-1">Welcome back, {user?.name || group.groupUsername}!</h2>
             <p className="text-indigo-200 text-sm mb-4">Track your FYP progress and manage your project</p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
                 <GraduationCap className="w-4 h-4 text-indigo-200" />
-                <span className="text-gray-800 text-sm">Group: {group.groupUsername}</span>
+                <span className="text-white text-sm">Group: {group.groupUsername}</span>
               </div>
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
                 group.status === 'VERIFIED' ? 'bg-green-600' : 
@@ -885,7 +925,8 @@ const OverviewTab = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Date & Day</p>
-                  <p className="font-semibold text-gray-800">{schedule?.date} ({schedule?.day})</p>
+                  <p className="font-semibold text-gray-800">{schedule?.date ? formatDate(schedule.date) : 'Not scheduled'} - 
+                  ({schedule?.day || 'TBA'})</p>
                 </div>
               </div>
               
@@ -895,7 +936,7 @@ const OverviewTab = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Time Slot</p>
-                  <p className="font-semibold text-gray-800">{schedule?.time}</p>
+                  <p className="font-semibold text-gray-800">{schedule?.startTime} - {schedule?.endTime}</p>
                 </div>
               </div>
               
@@ -916,7 +957,7 @@ const OverviewTab = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Jury</p>
-                  <p className="font-semibold text-gray-800">Assigned Committee</p>
+                  <p className="font-semibold text-gray-800">{schedule?.seniorName}, {schedule?.juniorName}</p>
                 </div>
               </div>
             </div>

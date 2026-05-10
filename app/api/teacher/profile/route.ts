@@ -2,10 +2,14 @@
 import { executeQuery } from "@/app/lib/db.server";
 import { NextRequest, NextResponse } from "next/server";
 
+// app/api/teacher/profile/route.ts - Add logging
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const email = searchParams.get("email");
+    
+    console.log("=== TEACHER PROFILE API ===");
+    console.log("Email received:", email);
     
     if (!email) {
       return NextResponse.json(
@@ -15,22 +19,28 @@ export async function GET(req: NextRequest) {
     }
     
     const teacherDetails = await executeQuery(
-      'SELECT * FROM teachers WHERE EMAIL = ?',
+      'SELECT teacherId, name, email, specialization, qualification, experience, role FROM teachers WHERE email = ?',
       [email],
     );
+    
+    console.log("Teacher query result:", teacherDetails);
     
     // Return the first object directly, not an array
     const teacher = Array.isArray(teacherDetails) && teacherDetails.length > 0 
       ? teacherDetails[0] 
       : null;
     
+    console.log("Processed teacher object:", teacher);
+    
     if (!teacher) {
+      console.log("❌ Teacher not found");
       return NextResponse.json(
         { message: "Teacher not found" },
         { status: 404 },
       );
     }
     
+    console.log("✅ Teacher found:", teacher.name);
     return NextResponse.json(teacher);
   } catch (error) {
     console.error("Error fetching teacher:", error);

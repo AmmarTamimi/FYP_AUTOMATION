@@ -1,9 +1,11 @@
 // app/api/admin/approve-group/route.ts
 import { NextResponse, NextRequest } from "next/server";
-import { executeQuery } from "@/app/lib/db.server";
+import { executeQuery, getConnection } from "@/app/lib/db.server";
 import { sendGroupCredentials } from "@/app/lib/email";
 
 export async function POST(req: NextRequest) {
+  let connection;
+  
   try {
     const body = await req.json();
     const groupId = body.groupId;
@@ -13,9 +15,9 @@ export async function POST(req: NextRequest) {
     console.log("Group ID:", groupId);
     console.log("Password:", password);
 
-    // Check if group exists
+    // Check if group exists (outside transaction)
     const checkGroup = await executeQuery(
-      "SELECT groupId, status FROM studentgroup WHERE groupId = ?",
+      "SELECT groupId, status, groupUsername, leaderEmail FROM studentgroup WHERE groupId = ?",
       [groupId],
     );
 
@@ -25,7 +27,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Group not found" }, { status: 404 });
     }
 
-    const groupStatus = (checkGroup as any[])[0]?.status;
+    const groupData = (checkGroup as any[])[0];
+    const groupStatus = groupData.status;
+    const groupUsername = groupData.groupUsername;
+    const leaderEmail = groupData.leaderEmail;
 
     if (groupStatus !== "PENDING") {
       return NextResponse.json(
@@ -34,42 +39,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ FIXED: Use single quotes around the string value
-    const updateResult = await executeQuery(
+    // ============================================
+    // START TRANSACTION
+    // ============================================
+    connection = await getConnection();
+    await connection.beginTransaction();
+    console.log("📦 Transaction started");
+
+    // Update group status and set password
+    await connection.execute(
       "UPDATE studentgroup SET status = 'VERIFIED', groupPass = ? WHERE groupId = ?",
       [password, groupId],
     );
 
-    console.log("Update result:", updateResult);
+    console.log(`✅ Group ${groupId} approved`);
 
-    const groupDetails = await executeQuery(
-      "SELECT groupUsername, leaderEmail FROM studentgroup WHERE groupId = ?",
-      [groupId],
-    );
+    // Commit transaction
+    await connection.commit();
+    console.log("✅ Transaction committed");
 
-    const leaderEmail = (groupDetails as any[])[0]?.leaderEmail;
-    const groupUsername = (groupDetails as any[])[0]?.groupUsername;
-    // After successful approval, send email
+    // ============================================
+    // Send email (outside transaction)
+    // ============================================
+    let emailSent = false;
     if (leaderEmail && groupUsername && password) {
-      const emailResult = await sendGroupCredentials(
-        leaderEmail,
-        groupUsername,
-        password,
-      );
-      console.log(`Email sent to ${leaderEmail}:`, emailResult.success);
+      const emailResult = await sendGroupCredentials(leaderEmail, groupUsername, password);
+      emailSent = emailResult.success;
+      console.log(`📧 Email sent to ${leaderEmail}: ${emailSent ? 'SUCCESS' : 'FAILED'}`);
     }
+
     return NextResponse.json({
       success: true,
       message: "Group approved successfully",
       leaderEmail: leaderEmail,
       groupUsername: groupUsername,
       password: password,
+      emailSent: emailSent
     });
+    
   } catch (error) {
+    // Rollback on error
+    if (connection) {
+      await connection.rollback();
+      console.error("❌ Transaction rolled back");
+    }
     console.error("ERROR DETAILS:", error);
     return NextResponse.json(
       { message: (error as Error).message, stack: (error as Error).stack },
       { status: 500 },
     );
+  } finally {
+    if (connection) connection.release();
   }
 }
