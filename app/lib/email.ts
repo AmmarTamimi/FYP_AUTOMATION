@@ -563,3 +563,681 @@ export async function sendGroupRejectionWithReason(leaderEmail: string, groupUse
   const fullReason = customReason + (additionalNotes ? `\n\nAdditional Notes: ${additionalNotes}` : '');
   return sendGroupRejectionEmail(leaderEmail, groupUsername, fullReason);
 }
+
+// lib/email.ts - Add these functions
+
+// ============================================
+// Teacher Jury Assignment Email
+// ============================================
+export async function sendTeacherJuryAssignment(
+  teacherEmail: string,
+  teacherName: string,
+  juryId: number,
+  role: 'senior' | 'junior',
+  groupCount: number,
+  assignmentLink: string
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending jury assignment email to: ${teacherEmail}`);
+    console.log(`📧 [EMAIL] Teacher: ${teacherName}`);
+    console.log(`📧 [EMAIL] Role: ${role}, Jury ID: ${juryId}`);
+
+    if (!teacherEmail || !teacherName) {
+      console.error(`❌ [EMAIL] Missing required fields`);
+      return { success: false, error: 'Missing recipient or teacher name' };
+    }
+
+    const roleTitle = role === 'senior' ? 'Senior Evaluator' : 'Junior Evaluator';
+    const roleIcon = role === 'senior' ? '👨‍🏫' : '👨‍🎓';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Jury Assignment Notification</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+          }
+          .content {
+            padding: 30px;
+            background: #ffffff;
+          }
+          .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+          }
+          .info-box {
+            background: #f0f4ff;
+            border-left: 4px solid #3F51B5;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+          }
+          .details-box {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .detail-item {
+            margin: 10px 0;
+          }
+          .detail-label {
+            font-weight: bold;
+            color: #3F51B5;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .detail-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1A237E;
+            margin-left: 10px;
+          }
+          .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 25px 0;
+          }
+          .btn-accept {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: bold;
+          }
+          .btn-reject {
+            background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: bold;
+          }
+          .btn-accept:hover, .btn-reject:hover {
+            opacity: 0.9;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="icon">${roleIcon}</div>
+            <h1>FYP Automation System</h1>
+            <p>Jury Assignment Notification</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              <strong>Dear ${teacherName},</strong>
+            </div>
+            
+            <p>You have been assigned as a <strong>${roleTitle}</strong> for the Final Year Project evaluations.</p>
+            
+            <div class="info-box">
+              <p>📢 <strong>Jury Assignment Details</strong></p>
+              <p>You have been selected to evaluate <strong>${groupCount}</strong> project(s) as part of Jury #${juryId}.</p>
+            </div>
+            
+            <div class="details-box">
+              <div class="detail-item">
+                <span class="detail-label">🎯 Role:</span>
+                <span class="detail-value">${roleTitle}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">🆔 Jury ID:</span>
+                <span class="detail-value">JRY-${juryId}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">📊 Projects to Evaluate:</span>
+                <span class="detail-value">${groupCount}</span>
+              </div>
+            </div>
+            
+            <div class="button-group">
+              <a href="${assignmentLink}?action=accept&juryId=${juryId}" class="btn-accept">✓ Accept Assignment</a>
+              <a href="${assignmentLink}?action=reject&juryId=${juryId}" class="btn-reject">✗ Request Change</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666; text-align: center;">
+              Please click Accept to confirm your participation, or Request Change if you have a conflict.
+            </p>
+            
+            <p>Best regards,<br>
+            <strong>FYP Automation Team</strong><br>
+            <span style="font-size: 12px; color: #666;">Final Year Project Management System</span></p>
+          </div>
+          
+          <div class="footer">
+            <p>© 2025 FYP Automation System | This is an automated message, please do not reply.</p>
+            <p>If you have any concerns, please contact the FYP coordinator.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      FYP Automation System - Jury Assignment
+      ========================================
+      
+      Dear ${teacherName},
+      
+      You have been assigned as a ${roleTitle} for the Final Year Project evaluations.
+      
+      Jury Assignment Details:
+      - Role: ${roleTitle}
+      - Jury ID: JRY-${juryId}
+      - Projects to Evaluate: ${groupCount}
+      
+      Please visit the following link to accept or request changes:
+      ${assignmentLink}?action=accept&juryId=${juryId}
+      
+      Best regards,
+      FYP Automation Team
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: teacherEmail,
+      subject: `📋 Jury Assignment: You've been selected as ${roleTitle}`,
+      html: htmlContent,
+      text: textContent,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high'
+      }
+    });
+
+    console.log(`✅ [EMAIL] Jury assignment email sent to ${teacherEmail}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send jury assignment email to ${teacherEmail}`);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+// ============================================
+// Teacher Schedule Update Email
+// ============================================
+export async function sendTeacherScheduleUpdate(
+  teacherEmail: string,
+  teacherName: string,
+  scheduleDetails: {
+    groupName: string;
+    date: string;
+    time: string;
+    venue: string;
+    projectTitle: string;
+  }[]
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending schedule update email to: ${teacherEmail}`);
+
+    const scheduleRows = scheduleDetails.map(s => `
+      <tr style="border-bottom: 1px solid #e0e0e0;">
+        <td style="padding: 10px;"><strong>${s.groupName}</strong></td>
+        <td style="padding: 10px;">${s.projectTitle || 'N/A'}</td>
+        <td style="padding: 10px;">${s.date}</td>
+        <td style="padding: 10px;">${s.time}</td>
+        <td style="padding: 10px;">${s.venue}</td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Schedule Update Notification</title>
+        <style>
+          body { font-family: 'Segoe UI', sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
+          .container { max-width: 700px; margin: 20px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%); color: white; padding: 30px; text-align: center; }
+          .content { padding: 30px; }
+          .greeting { font-size: 18px; margin-bottom: 20px; }
+          .info-box { background: #f0f4ff; border-left: 4px solid #3F51B5; padding: 15px 20px; margin: 20px 0; border-radius: 8px; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th { background: #1A237E; color: white; padding: 12px; text-align: left; }
+          td { padding: 10px; border-bottom: 1px solid #e0e0e0; }
+          .button { background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 6px; display: inline-block; margin: 20px 0; }
+          .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e0e0e0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📅 Schedule Updated</h1>
+            <p>FYP Automation System</p>
+          </div>
+          <div class="content">
+            <div class="greeting"><strong>Dear ${teacherName},</strong></div>
+            <p>Your evaluation schedule has been updated. ${scheduleDetails.length} new group(s) have been assigned to you.</p>
+            <div class="info-box">📢 Please review your updated schedule below.</div>
+            <table>
+              <thead><tr><th>Group</th><th>Project</th><th>Date</th><th>Time</th><th>Venue</th></tr></thead>
+              <tbody>${scheduleRows}</tbody>
+            </table>
+            <div style="text-align: center;">
+              <a href="https://fyp-automation-fast.vercel.app/teacher/dashboard" class="button">📋 View Full Schedule</a>
+            </div>
+            <p>Best regards,<br><strong>FYP Automation Team</strong></p>
+          </div>
+          <div class="footer"><p>© 2025 FYP Automation System | This is an automated message.</p></div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: teacherEmail,
+      subject: `📅 Schedule Update: ${scheduleDetails.length} New Group(s) Assigned`,
+      html: htmlContent,
+      text: `Dear ${teacherName},\n\nYour evaluation schedule has been updated. ${scheduleDetails.length} new group(s) have been assigned to you.\n\nPlease log in to view your full schedule.\n\nBest regards,\nFYP Automation Team`,
+    });
+
+    console.log(`✅ [EMAIL] Schedule update email sent to ${teacherEmail}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send schedule update email to ${teacherEmail}`);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+// ============================================
+// Teacher Jury Conflict/Change Request Email
+// ============================================
+export async function sendTeacherConflictNotification(
+  teacherEmail: string,
+  teacherName: string,
+  conflictDetails: {
+    existingGroup: string;
+    newGroup: string;
+    date: string;
+    time: string;
+    venue: string;
+  }
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending conflict notification to: ${teacherEmail}`);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Schedule Conflict Notification</title>
+        <style>
+          body { font-family: 'Segoe UI', sans-serif; line-height: 1.6; background-color: #f4f4f4; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); color: white; padding: 30px; text-align: center; }
+          .content { padding: 30px; }
+          .conflict-box { background: #fff5f5; border-left: 4px solid #DC143C; padding: 15px 20px; margin: 20px 0; border-radius: 8px; }
+          .button { background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%); color: white; text-decoration: none; padding: 12px 25px; border-radius: 6px; display: inline-block; margin: 20px 0; }
+          .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e0e0e0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header"><h1>⚠️ Schedule Conflict Detected</h1><p>FYP Automation System</p></div>
+          <div class="content">
+            <div class="greeting"><strong>Dear ${teacherName},</strong></div>
+            <p>A scheduling conflict has been detected in your evaluation assignments.</p>
+            <div class="conflict-box">
+              <p><strong>📅 Date:</strong> ${conflictDetails.date}</p>
+              <p><strong>⏰ Time:</strong> ${conflictDetails.time}</p>
+              <p><strong>📍 Venue:</strong> ${conflictDetails.venue}</p>
+              <p><strong>⚠️ Existing Group:</strong> ${conflictDetails.existingGroup}</p>
+              <p><strong>➕ New Group:</strong> ${conflictDetails.newGroup}</p>
+            </div>
+            <p>Please contact the FYP coordinator to resolve this scheduling conflict.</p>
+            <div style="text-align: center;">
+              <a href="${process.env.NEXTAUTH_URL}/teacher/schedule" class="button">📋 View Schedule</a>
+            </div>
+            <p>Best regards,<br><strong>FYP Automation Team</strong></p>
+          </div>
+          <div class="footer"><p>© 2025 FYP Automation System | This is an automated message.</p></div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: teacherEmail,
+      subject: `⚠️ Schedule Conflict Detected - Action Required`,
+      html: htmlContent,
+    });
+
+    console.log(`✅ [EMAIL] Conflict notification sent to ${teacherEmail}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send conflict notification to ${teacherEmail}`);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+// lib/email.ts - Add this function
+
+// ============================================
+// Teacher Credentials Email
+// ============================================
+export async function sendTeacherCredentials(
+  teacherEmail: string,
+  teacherName: string,
+  username: string,
+  password: string,
+  role: 'senior' | 'junior'
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending teacher credentials email to: ${teacherEmail}`);
+    console.log(`📧 [EMAIL] Teacher: ${teacherName}`);
+    console.log(`📧 [EMAIL] Role: ${role}`);
+
+    // Validate inputs
+    if (!teacherEmail || !teacherName || !username || !password) {
+      console.error(`❌ [EMAIL] Missing required fields for teacher credentials`);
+      return { 
+        success: false, 
+        error: 'Missing recipient, teacher name, username, or password' 
+      };
+    }
+
+    const roleTitle = role === 'senior' ? 'Senior Evaluator' : 'Junior Evaluator';
+    const roleIcon = role === 'senior' ? '👨‍🏫' : '👨‍🎓';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Teacher Account Credentials</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+          }
+          .content {
+            padding: 30px;
+            background: #ffffff;
+          }
+          .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+          }
+          .message-box {
+            background: #f0f4ff;
+            border-left: 4px solid #3F51B5;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+          }
+          .credentials {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+          }
+          .credential-item {
+            margin: 15px 0;
+          }
+          .credential-label {
+            font-weight: bold;
+            color: #3F51B5;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .credential-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1A237E;
+            font-family: 'Courier New', monospace;
+            background: #e8eaf6;
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            margin-top: 8px;
+          }
+          .button {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 20px 0;
+            font-weight: bold;
+          }
+          .button:hover {
+            opacity: 0.9;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+          }
+          .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+          }
+          .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="icon">${roleIcon}</div>
+            <h1>FYP Automation System</h1>
+            <p>Teacher Account Credentials</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              <strong>Dear ${teacherName},</strong>
+            </div>
+            
+            <p>Welcome to the FYP Automation System! Your teacher account has been created with the role of <strong>${roleTitle}</strong>.</p>
+            
+            <div class="message-box">
+              <p>📢 <strong>Your account is now active!</strong> You can now access the FYP Automation System using the credentials below.</p>
+            </div>
+            
+            <div class="credentials">
+              <div class="credential-item">
+                <div class="credential-label">🔑 USERNAME / EMAIL</div>
+                <div class="credential-value">${username}</div>
+              </div>
+              <div class="credential-item">
+                <div class="credential-label">🔐 PASSWORD</div>
+                <div class="credential-value">${password}</div>
+              </div>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="https://fyp-automation-fast.vercel.app/auth/login" class="button">🚀 Login to Dashboard</a>
+            </div>
+            
+            <div class="message-box warning">
+              <p>⚠️ <strong>Important:</strong> Please keep these credentials secure. Do not share them with anyone.</p>
+              <p style="font-size: 14px; margin-top: 10px;">💡 For security reasons, please change your password after your first login.</p>
+            </div>
+            
+            <div class="info-text">
+              <p>As a ${roleTitle.toLowerCase()}, you will be responsible for evaluating Final Year Projects.</p>
+              <p>You will receive email notifications when groups are assigned to your jury and when schedules are created.</p>
+            </div>
+            
+            <p>If you have any questions or need assistance, please contact the FYP coordinator.</p>
+            
+            <p>Best regards,<br>
+            <strong>FYP Automation Team</strong><br>
+            <span style="font-size: 12px; color: #666;">Final Year Project Management System</span></p>
+          </div>
+          
+          <div class="footer">
+            <p>© 2025 FYP Automation System | This is an automated message, please do not reply.</p>
+            <p>Sent from the FYP Automation System</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      FYP Automation System - Teacher Account Credentials
+      ===================================================
+      
+      Dear ${teacherName},
+      
+      Welcome to the FYP Automation System! Your teacher account has been created with the role of ${roleTitle}.
+      
+      LOGIN CREDENTIALS:
+      ------------------
+      Username/Email: ${username}
+      Password: ${password}
+      
+      Login URL: https://fyp-automation-fast.vercel.app/auth/login
+      
+      Important: Please keep these credentials secure. For security reasons, please change your password after your first login.
+      
+      As a ${roleTitle.toLowerCase()}, you will be responsible for evaluating Final Year Projects. You will receive email notifications when groups are assigned to your jury and when schedules are created.
+      
+      Best regards,
+      FYP Automation Team
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: teacherEmail,
+      subject: `📋 Welcome to FYP Automation System - Your Account Credentials (${roleTitle})`,
+      html: htmlContent,
+      text: textContent,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high'
+      }
+    });
+
+    console.log(`✅ [EMAIL] Teacher credentials email sent to ${teacherEmail}`);
+    console.log(`✅ [EMAIL] Message ID: ${info.messageId}`);
+    console.log(`✅ [EMAIL] Sent at: ${new Date().toISOString()}`);
+    
+    return { 
+      success: true, 
+      messageId: info.messageId,
+      recipient: teacherEmail,
+      teacher: teacherName,
+      role: role,
+      sentAt: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send teacher credentials email to ${teacherEmail}`);
+    console.error(`❌ [EMAIL] Error details:`, error);
+    
+    if (error instanceof Error) {
+      console.error(`❌ [EMAIL] Error name: ${error.name}`);
+      console.error(`❌ [EMAIL] Error message: ${error.message}`);
+    }
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown email error',
+      recipient: teacherEmail,
+      teacher: teacherName
+    };
+  }
+}

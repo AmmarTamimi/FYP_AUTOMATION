@@ -1,6 +1,7 @@
 // app/api/admin/assign-jury/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/app/lib/db.server";
+import { sendTeacherJuryAssignment } from "@/app/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -205,6 +206,31 @@ export async function POST(req: NextRequest) {
     ]);
 
     console.log("jury assignment completed successfully!");
+    //send mail to teacher
+    // After creating/assigning jury
+    console.log("Sending mails to senior: ",seniorTeacher.EMAIL," junior: ",juniorTeacher.EMAIL);
+    const projectCount =
+      (jury as any[])[0]?.NUMOFPROJECTSASSIGNED ||
+      (jury as any[])[0]?.numOfProjectsAssigned ||
+      0;
+
+    await sendTeacherJuryAssignment(
+      seniorTeacher.EMAIL,
+      seniorTeacher.NAME,
+      juryId,
+      "senior", // 'senior' or 'junior'
+      projectCount,
+      'https://fyp-automation-fast.vercel.app/teacher/jury-response',
+    );
+
+    await sendTeacherJuryAssignment(
+      juniorTeacher.EMAIL,
+      juniorTeacher.NAME,
+      juryId,
+      "junior", // 'senior' or 'junior'
+      projectCount,
+      'https://fyp-automation-fast.vercel.app/teacher/jury-response',
+    );
 
     return NextResponse.json({
       success: true,

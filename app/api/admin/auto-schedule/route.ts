@@ -1,6 +1,17 @@
 // app/api/admin/auto-schedule/route.ts (Fixed version)
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/app/lib/db.server";
+import { sendTeacherScheduleUpdate } from "@/app/lib/email";
+
+interface TeacherAssignment {
+  groupId: number;
+  groupUsername: string;
+  projectTitle: string;
+  date: string;
+  time: string;
+  venue: string;
+  scheduleId: number;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,14 +20,16 @@ export async function POST(req: NextRequest) {
     console.log("=== AUTO SCHEDULING STARTED ===");
     console.log(`Date Range: ${startDate} to ${endDate}`);
 
-    // Step 1: Get all verified groups with their assigned juries
+    // Step 1: Get all verified groups with their assigned juries AND project titles
     const groups = await executeQuery(
       `SELECT DISTINCT
         sg.groupId, 
         sg.groupUsername, 
         sg.juryId, 
-        sg.leaderEmail
+        sg.leaderEmail,
+        COALESCE(p.PROJECTTITLE, 'No Project Title') as projectTitle
        FROM studentgroup sg
+       LEFT JOIN project p ON sg.groupId = p.GROUPID
        WHERE sg.status = 'VERIFIED' 
          AND sg.juryId IS NOT NULL
          AND sg.groupId NOT IN (SELECT groupId FROM schedule)
@@ -67,13 +80,16 @@ export async function POST(req: NextRequest) {
       []
     );
 
+    // ✅ FIX 1: Use lowercase 'number'
+    const teacherAssignments = new Map<number, TeacherAssignment[]>();
+
     // Step 6: Track occupied resources using Set
-    const occupiedVenueSlot = new Set(); // venueId-date-slotNum
-    const occupiedTeacherSlot = new Set(); // teacherId-date-slotNum
+    const occupiedVenueSlot = new Set();
+    const occupiedTeacherSlot = new Set();
     const dailyGroupCount = new Map();
     dates.forEach((date) => dailyGroupCount.set(date, 0));
 
-    // ✅ CRITICAL FIX: Load existing schedules from database
+    // Load existing schedules from database
     console.log("Loading existing schedules from database...");
     const existingSchedules = await executeQuery(
       `SELECT s.dateVal, s.slotNum, s.venueId, s.juryId
@@ -87,7 +103,6 @@ export async function POST(req: NextRequest) {
       const venueKey = `${schedule.venueId}-${schedule.dateVal}-${schedule.slotNum}`;
       occupiedVenueSlot.add(venueKey);
       
-      // Get jury teachers for this schedule
       const jury = juryMap.get(schedule.juryId);
       if (jury) {
         for (const teacherId of jury.teachers) {
@@ -97,7 +112,6 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      // Update daily count for existing schedules
       dailyGroupCount.set(schedule.dateVal, (dailyGroupCount.get(schedule.dateVal) || 0) + 1);
     }
 
@@ -129,7 +143,6 @@ export async function POST(req: NextRequest) {
       console.log(`\n=== Scheduling group ${group.groupUsername} (Jury ${group.juryId}) ===`);
       console.log(`Teachers in this jury: ${juryTeachers.join(", ")}`);
 
-      // Sort dates by current load (least crowded first)
       const sortedDates = [...dates].sort(
         (a, b) => (dailyGroupCount.get(a) || 0) - (dailyGroupCount.get(b) || 0)
       );
@@ -144,10 +157,8 @@ export async function POST(req: NextRequest) {
           for (const venue of venues as any[]) {
             const venueKey = `${venue.VenueId}-${date}-${slot.slotNum}`;
 
-            // Check if venue is available (including existing schedules)
             if (occupiedVenueSlot.has(venueKey)) continue;
 
-            // Check if ANY teacher in this jury is already occupied at this time (including existing schedules)
             let teacherAvailable = true;
             let busyTeacher = null;
 
@@ -165,7 +176,6 @@ export async function POST(req: NextRequest) {
               continue;
             }
 
-            // All checks passed - assign this group
             const dayName = new Date(date).toLocaleDateString("en-US", {
               weekday: "long",
             });
@@ -176,12 +186,29 @@ export async function POST(req: NextRequest) {
               [dayName, date, group.juryId, slot.slotNum, group.groupId, venue.VenueId]
             );
 
-            // Mark resources as occupied
             occupiedVenueSlot.add(venueKey);
+
+            // ✅ FIX 3: Push assignment for each teacher
+            const newAssignment: TeacherAssignment = {
+              groupId: group.groupId,
+              groupUsername: group.groupUsername,
+              projectTitle: group.projectTitle || "No Project Title",
+              date: date,
+              time: `${slot.startTime} - ${slot.endTime}`,
+              venue: venue.name,
+              scheduleId: (result as any).insertId
+            };
 
             for (const teacherId of juryTeachers) {
               const teacherKey = `${teacherId}-${date}-${slot.slotNum}`;
               occupiedTeacherSlot.add(teacherKey);
+              
+              // ✅ Add assignment to teacher's list
+              if (!teacherAssignments.has(teacherId)) {
+                teacherAssignments.set(teacherId, []);
+              }
+              teacherAssignments.get(teacherId)!.push(newAssignment);
+              
               console.log(`  ✅ Teacher ${teacherId} marked as occupied on ${date} at slot ${slot.slotNum}`);
             }
 
@@ -200,6 +227,7 @@ export async function POST(req: NextRequest) {
 
             assigned = true;
             console.log(`✅ SUCCESS: Assigned ${group.groupUsername} to ${date} at ${slot.startTime} in ${venue.name}`);
+
             break;
           }
         }
@@ -211,7 +239,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 8: Return summary
+    // ✅ AFTER ALL SCHEDULING IS DONE, SEND EMAIL NOTIFICATIONS TO TEACHERS
+    console.log("\n=== SENDING TEACHER NOTIFICATIONS ===");
+    
+    for (const [teacherId, assignments] of teacherAssignments) {
+      try {
+        const teacherInfo = await executeQuery(
+          `SELECT name, email FROM teachers WHERE teacherId = ?`,
+          [teacherId]
+        );
+        
+        const teacherName = (teacherInfo as any[])[0]?.name;
+        const teacherEmail = (teacherInfo as any[])[0]?.email;
+        
+        if (teacherEmail && teacherName && assignments.length > 0) {
+          const scheduleDetails = assignments.map((a: TeacherAssignment) => ({
+            groupName: a.groupUsername,
+            projectTitle: a.projectTitle,
+            date: new Date(a.date).toLocaleDateString(),
+            time: a.time,
+            venue: a.venue
+          }));
+          
+          await sendTeacherScheduleUpdate(
+            teacherEmail,
+            teacherName,
+            scheduleDetails
+          );
+          
+          console.log(`✅ Email sent to ${teacherName} (${teacherEmail}) for ${assignments.length} new assignment(s)`);
+        }
+      } catch (emailError) {
+        console.error(`❌ Failed to send email to teacher ${teacherId}:`, emailError);
+      }
+    }
+
     const assignedCount = assignedGroups.length;
 
     return NextResponse.json({
