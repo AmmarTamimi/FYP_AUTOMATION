@@ -23,13 +23,19 @@ interface Member {
   section: string;
 }
 
+interface Department {
+    deptId: number;
+    name: string;
+    hodId?: number;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [customDomain, setCustomDomain] = useState("");
-
+  const [departments, setDepartments] = useState<Department[]>([])
   const [formData, setFormData] = useState({
     groupUsername: "",
     deptId: "",
@@ -60,14 +66,22 @@ export default function RegisterPage() {
     "DevOps",
   ];
 
-  // Department options
-  const departmentOptions = [
-    "Computer Science",
-    "Software Engineering",
-    "Data Science",
-    "Artificial Intelligence",
-  ];
 
+
+  useEffect(() => {
+   fetchDepartments();
+  }, [])
+  
+  const fetchDepartments = async() => {
+    try {
+        const res = await fetch('/api/admin/departments');
+        const data = await res.json();
+        setDepartments(data);
+        console.log("department data: ",data)
+    } catch (error) {
+        console.log("error in fetching departs", error);
+    }
+  }
   const validateNUEmail = (email: string): boolean => {
     return /^k\d{6}@nu\.edu\.pk$/i.test(email);
   };
@@ -225,7 +239,7 @@ export default function RegisterPage() {
             approved.
           </p>
           <Link
-            href="/auth/login"
+            href="/login"
             className="inline-block bg-[#3F51B5] text-white px-6 py-2 rounded-lg hover:bg-[#5C6BC0] transition-colors"
           >
             Return to Login
@@ -291,9 +305,9 @@ export default function RegisterPage() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
                 >
                   <option value="">Select Department</option>
-                  {departmentOptions.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
+                  {departments.map((dept) => (
+                    <option key={dept.deptId} value={dept.deptId}>
+                      {dept.name}
                     </option>
                   ))}
                 </select>
@@ -582,7 +596,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-sm text-gray-500">
             Already have an account?{" "}
-            <Link href="/auth/login" className="text-[#3F51B5] hover:text-[#5C6BC0]">
+            <Link href="/login" className="text-[#3F51B5] hover:text-[#5C6BC0]">
               Sign In
             </Link>
           </p>

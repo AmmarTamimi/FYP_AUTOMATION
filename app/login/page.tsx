@@ -1,7 +1,7 @@
 // app/(auth)/login/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -16,9 +16,17 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [activeRole, setActiveRole] = useState<'student' | 'admin' | 'teacher'>('student');
 
-  // app/(auth)/login/page.tsx - Update handleSubmit function
+    useEffect(() => {
+        fetchDepartments()
+    }, [])
 
-// app/(auth)/login/page.tsx - Updated handleSubmit
+    const fetchDepartments = async() => {
+        try {
+            
+        } catch (error) {
+            
+        }
+    }
 
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -75,6 +83,8 @@ const handleSubmit = async (e: React.FormEvent) => {
     setLoading(false);
   }
 };
+
+
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -219,12 +229,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </form>
 
                     {/* Register Link */}
-                    <p className="mt-6 text-center text-sm text-gray-500">
+                   {activeRole === 'student' &&  <p className="mt-6 text-center text-sm text-gray-500">
                         Don't have an account?{' '}
-                        <Link href="/auth/register" className="text-[#3F51B5] hover:text-[#5C6BC0] font-medium">
+                        <Link href="/register" className="text-[#3F51B5] hover:text-[#5C6BC0] font-medium">
                             Register as Student Group
                         </Link>
-                    </p>
+                    </p>}
                 </div>
             </div>
         </div>

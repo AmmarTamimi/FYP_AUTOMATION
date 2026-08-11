@@ -171,7 +171,7 @@ export async function sendGroupCredentials(leaderEmail: string, groupUsername: s
             </div>
             
             <div style="text-align: center;">
-              <a href="https://fyp-automation-fast.vercel.app/auth/login" class="button">🚀 Login to Dashboard</a>
+              <a href="https://fyp-automation-fast.vercel.app/login" class="button">🚀 Login to Dashboard</a>
             </div>
             
             <div class="message-box warning">
@@ -468,7 +468,7 @@ export async function sendGroupRejectionEmail(leaderEmail: string, groupUsername
             </div>
             
             <div style="text-align: center;">
-              <a href="https://fyp-automation-fast.vercel.app/auth/register" class="button">🔄 Submit New Application</a>
+              <a href="https://fyp-automation-fast.vercel.app/register" class="button">🔄 Submit New Application</a>
             </div>
             
             <div class="next-steps" style="background: #fff3cd; margin-top: 20px;">
@@ -1146,7 +1146,7 @@ export async function sendTeacherCredentials(
             </div>
             
             <div style="text-align: center;">
-              <a href="https://fyp-automation-fast.vercel.app/auth/login" class="button">🚀 Login to Dashboard</a>
+              <a href="https://fyp-automation-fast.vercel.app/login" class="button">🚀 Login to Dashboard</a>
             </div>
             
             <div class="message-box warning">
@@ -1188,7 +1188,7 @@ export async function sendTeacherCredentials(
       Username/Email: ${username}
       Password: ${password}
       
-      Login URL: https://fyp-automation-fast.vercel.app/auth/login
+      Login URL: https://fyp-automation-fast.vercel.app/login
       
       Important: Please keep these credentials secure. For security reasons, please change your password after your first login.
       

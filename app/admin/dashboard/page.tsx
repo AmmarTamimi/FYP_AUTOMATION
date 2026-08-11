@@ -631,7 +631,7 @@ export default function AdminDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    router.push("/auth/login");
+    router.push("/login");
   };
 
   const handleAddTeacher = async (teacherData: any) => {

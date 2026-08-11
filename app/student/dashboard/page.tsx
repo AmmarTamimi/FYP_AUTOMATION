@@ -318,7 +318,7 @@ const formatDate = (dateString: string) => {
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    router.push('/auth/login');
+    router.push('/login');
   };
 
   // ============================================

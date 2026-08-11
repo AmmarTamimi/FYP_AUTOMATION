@@ -344,7 +344,7 @@ Object.keys(scheduleByDate).forEach((dateKey) => {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    router.push("/auth/login");
+    router.push("/login");
   };
 
   // ============================================

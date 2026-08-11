@@ -13,7 +13,7 @@ export default function HomePage() {
     if (status === 'loading') return;
 
     if (!session) {
-      router.push('/auth/login');
+      router.push('/login');
     } else {
       // Now TypeScript knows about session.user.role
       switch (session.user?.role) {
@@ -27,7 +27,7 @@ export default function HomePage() {
           router.push('/dashboard/student');
           break;
         default:
-          router.push('/auth/login');
+          router.push('/login');
       }
     }
   }, [session, status, router]);
