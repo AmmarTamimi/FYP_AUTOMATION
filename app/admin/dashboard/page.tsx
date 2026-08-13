@@ -1,14 +1,13 @@
 // app/(dashboard)/admin/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
   GraduationCap,
   BookOpen,
   Plus,
-  Edit,
   Trash2,
   CheckCircle,
   XCircle,
@@ -22,26 +21,22 @@ import {
   ChevronRight,
   AlertCircle,
   Mail,
-  Send,
   UserCheck,
-  Briefcase,
-  Target,
   FileText,
   Calendar,
   Lock,
   Shield,
   Settings,
+  Bell,
+  LayoutGrid,
+  User,
+  ClipboardList,
+  Building2,
 } from "lucide-react";
 
-interface ModalGroupData extends StudentGroup {
-  members: Member[];
-  projectDetails?: {
-    PROJECTID?: number;
-    domains?: string;
-    PROJECTTITLE?: string;
-    PROPOSALDOCUMENT?: string;
-  };
-}
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 interface Member {
   studentId: number;
@@ -52,7 +47,6 @@ interface Member {
   batch: number;
 }
 
-// Types based on your schema
 interface StudentGroup {
   groupId: number;
   groupUsername: string;
@@ -62,6 +56,16 @@ interface StudentGroup {
   status: "PENDING" | "VERIFIED" | "DENIED";
   juryId: number;
   members: Member[];
+}
+
+interface ModalGroupData extends StudentGroup {
+  members: Member[];
+  projectDetails?: {
+    PROJECTID?: number;
+    domains?: string;
+    PROJECTTITLE?: string;
+    PROPOSALDOCUMENT?: string;
+  };
 }
 
 interface Student {
@@ -88,94 +92,251 @@ interface Teacher {
   specialization: string;
 }
 
-type TabType = "pending" | "verified" | "departments" | "teachers" | "students" | "settings";
-interface StudentGroup {
-  groupId: number;
-  groupUsername: string;
-  // ... other properties
-}
+type TabType =
+  | "pending"
+  | "verified"
+  | "students"
+  | "departments"
+  | "teachers"
+  | "profile"
+  | "settings";
 
-// ============================================
-// MODAL COMPONENTS (OUTSIDE THE MAIN COMPONENT)
-// ============================================
+/* ============================================================
+   SHARED UI PRIMITIVES  (module scope = no remount on re-render)
+   ============================================================ */
 
-// Department Modal - This is OUTSIDE AdminDashboard
-interface DepartmentModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (name: string) => void;
-}
+const Card = ({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <div
+    className={`bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${className}`}
+  >
+    {children}
+  </div>
+);
 
-const DepartmentModalComponent = ({
-  isOpen,
-  onClose,
-  onSave,
-}: DepartmentModalProps) => {
-  const [name, setName] = useState("");
+const SectionHeader = ({
+  title,
+  subtitle,
+  icon: Icon,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: any;
+  action?: React.ReactNode;
+}) => (
+  <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-slate-100">
+    <div className="flex items-center gap-3">
+      {Icon && (
+        <span className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+          <Icon className="w-[18px] h-[18px]" />
+        </span>
+      )}
+      <div>
+        <h3 className="text-[15px] font-semibold text-slate-900">{title}</h3>
+        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+    {action}
+  </div>
+);
 
-  useEffect(() => {
-    if (isOpen) {
-      setName("");
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
+const Badge = ({
+  children,
+  tone = "slate",
+}: {
+  children: React.ReactNode;
+  tone?: "slate" | "indigo" | "green" | "amber" | "rose" | "violet";
+}) => {
+  const tones: Record<string, string> = {
+    slate: "bg-slate-100 text-slate-600",
+    indigo: "bg-indigo-50 text-indigo-600",
+    green: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+    rose: "bg-rose-50 text-rose-600",
+    violet: "bg-violet-50 text-violet-600",
+  };
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Add Department</h3>
-          <button onClick={onClose}>
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Department Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            placeholder="e.g., Computer Science"
-            autoFocus
-          />
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium ${tones[tone]}`}
+    >
+      {children}
+    </span>
+  );
+};
+
+const btnPrimary =
+  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 active:bg-indigo-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const btnGhost =
+  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50";
+const btnGreen =
+  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const btnRose =
+  "inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const inputBase =
+  "w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition";
+const labelBase = "block text-[13px] font-medium text-slate-700 mb-1.5";
+const th = "text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500";
+const td = "px-5 py-3.5 text-sm text-slate-700";
+
+const EmptyState = ({
+  icon: Icon,
+  title,
+  message,
+}: {
+  icon: any;
+  title: string;
+  message: string;
+}) => (
+  <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+      <Icon className="w-6 h-6 text-slate-400" />
+    </div>
+    <h3 className="text-[15px] font-semibold text-slate-800">{title}</h3>
+    <p className="text-sm text-slate-500 mt-1 max-w-sm">{message}</p>
+  </div>
+);
+
+/* ---------- Modal shell ---------- */
+const ModalShell = ({
+  title,
+  subtitle,
+  icon: Icon,
+  tone = "indigo",
+  onClose,
+  children,
+  footer,
+  size = "md",
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: any;
+  tone?: "indigo" | "green" | "rose";
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  size?: "md" | "lg" | "xl";
+}) => {
+  const tones: Record<string, string> = {
+    indigo: "bg-indigo-50 text-indigo-600",
+    green: "bg-emerald-50 text-emerald-600",
+    rose: "bg-rose-50 text-rose-600",
+  };
+  const sizes: Record<string, string> = {
+    md: "max-w-md",
+    lg: "max-w-2xl",
+    xl: "max-w-4xl",
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+      <div
+        className={`w-full ${sizes[size]} bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden`}
+      >
+        <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            {Icon && (
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${tones[tone]}`}>
+                <Icon className="w-[18px] h-[18px]" />
+              </span>
+            )}
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+              {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
           >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(name)}
-            className="px-4 py-2 bg-[#3F51B5] text-white rounded-lg"
-          >
-            Add
+            <X className="w-4 h-4" />
           </button>
         </div>
+        <div className="px-6 py-5 overflow-y-auto">{children}</div>
+        {footer && (
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60 flex justify-end gap-2">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// Teacher Modal - This is OUTSIDE AdminDashboard
-interface TeacherModalProps {
+/* ============================================================
+   ADD DEPARTMENT MODAL
+   ============================================================ */
+
+const DepartmentModalComponent = ({
+  isOpen,
+  onClose,
+  onSave,
+}: {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (teacher: any) => void;
-  departments: any[];
-}
+  onSave: (name: string) => void;
+}) => {
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (isOpen) setName("");
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <ModalShell
+      title="Add Department"
+      subtitle="Create a new academic department"
+      icon={Building2}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className={btnGhost}>
+            Cancel
+          </button>
+          <button onClick={() => onSave(name)} className={btnPrimary}>
+            <Plus className="w-4 h-4" />
+            Add Department
+          </button>
+        </>
+      }
+    >
+      <label className={labelBase}>Department Name</label>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className={inputBase}
+        placeholder="e.g., Computer Science"
+        autoFocus
+      />
+      <p className="text-xs text-slate-400 mt-2">
+        This name will appear when assigning teachers and juries.
+      </p>
+    </ModalShell>
+  );
+};
+
+/* ============================================================
+   ADD TEACHER MODAL
+   ============================================================ */
 
 const TeacherModalComponent = ({
   isOpen,
   onClose,
   onSave,
   departments,
-}: TeacherModalProps) => {
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (teacher: any) => void;
+  departments: any[];
+}) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -203,1549 +364,171 @@ const TeacherModalComponent = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Add Teacher</h3>
-          <button onClick={onClose}>
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-              autoFocus
-            />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email *
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Department *
-            </label>
-            <select
-              value={formData.department}
-              onChange={(e) =>
-                setFormData({ ...formData, department: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            >
-              <option value="">Select</option>
-              {departments.map((dept) => (
-                <option key={dept.deptId} value={dept.name}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Specialization *
-            </label>
-            <input
-              type="text"
-              value={formData.specialization}
-              onChange={(e) =>
-                setFormData({ ...formData, specialization: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Qualification *
-            </label>
-            <input
-              type="text"
-              value={formData.qualification}
-              onChange={(e) =>
-                setFormData({ ...formData, qualification: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Experience (years) *
-            </label>
-            <input
-              type="number"
-              value={formData.experience}
-              onChange={(e) =>
-                setFormData({ ...formData, experience: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Role *
-            </label>
-            <select
-              value={formData.role}
-              onChange={(e) =>
-                setFormData({ ...formData, role: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg"
-            >
-              <option value="junior">Junior</option>
-              <option value="senior">Senior</option>
-            </select>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
-          >
+    <ModalShell
+      title="Add Teacher"
+      subtitle="Register a faculty member for jury assignment"
+      icon={Users}
+      size="lg"
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className={btnGhost}>
             Cancel
           </button>
-          <button
-            onClick={() => onSave(formData)}
-            className="px-4 py-2 bg-[#3F51B5] text-white rounded-lg"
-          >
+          <button onClick={() => onSave(formData)} className={btnPrimary}>
+            <Plus className="w-4 h-4" />
             Add Teacher
           </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default function AdminDashboard() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("pending");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [scheduling, setScheduling] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleDates, setScheduleDates] = useState({
-    startDate: "",
-    endDate: "",
-  });
-
-  // Data states
-  const [pendingGroups, setPendingGroups] = useState<StudentGroup[]>([]);
-  const [verifiedGroups, setVerifiedGroups] = useState<StudentGroup[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-
-  // Modal states
-  const [showGroupModal, setShowGroupModal] = useState<{
-    show: boolean;
-    group: ModalGroupData | null;
-  }>({
-    show: false,
-    group: null,
-  });
-  const [rejectModal, setRejectModal] = useState<{
-    show: boolean;
-    groupId: number | null;
-    reason: string;
-  }>({
-    show: false,
-    groupId: null,
-    reason: "",
-  });
-  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
-  const [showTeacherModal, setShowTeacherModal] = useState(false);
-  const [showCredentials, setShowCredentials] = useState<{
-    show: boolean;
-    group: StudentGroup | null;
-    password: string;
-  }>({ show: false, group: null, password: "" });
-
-  // Form states
-  const [departmentForm, setDepartmentForm] = useState({ name: "" });
-  const [teacherForm, setTeacherForm] = useState({
-    name: "",
-    email: "",
-    department: "",
-    specialization: "",
-    qualification: "",
-    experience: "",
-    role: "junior",
-  });
-
-  // Search
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Stats
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalTeachers: 0,
-    totalDepartments: 0,
-    pendingGroups: 0,
-  });
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (!storedUser) {
-      router.push("/login");
-      return;
-    }
-    const parsedUser = JSON.parse(storedUser);
-    if (parsedUser.role !== "ADMIN") {
-      router.push("/login");
-      return;
-    }
-    setUser(parsedUser);
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      // Fetch pending groups (where status = 'PENDING')
-      const pendingRes = await fetch("/api/admin/groups?status=PENDING");
-      const pendingData = await pendingRes.json();
-      console.log("Groups fetched: ", pendingData);
-      setPendingGroups(pendingData);
-
-      // Fetch verified groups
-      const verifiedRes = await fetch("/api/admin/groups?status=VERIFIED");
-      const verifiedData = await verifiedRes.json();
-      setVerifiedGroups(verifiedData);
-
-      // Fetch departments
-      const deptRes = await fetch("/api/admin/departments");
-      const deptData = await deptRes.json();
-      setDepartments(deptData);
-
-      // Fetch teachers
-      const teacherRes = await fetch("/api/admin/teachers");
-      const teacherData = await teacherRes.json();
-      setTeachers(teacherData);
-
-      // Fetch students and extract roll number from email
-      const studentRes = await fetch("/api/admin/students");
-      let studentData = await studentRes.json();
-
-      // ✅ Process each student with safety check
-      if (Array.isArray(studentData)) {
-        studentData = studentData.map((student: any) => {
-          // ✅ Check if email exists before calling match
-          const email = student?.email || "";
-          let rollNumber = "";
-
-          if (email && typeof email === "string") {
-            const match = email.match(/k(\d{2})(\d{4})@/);
-            if (match) {
-              const firstTwo = match[1]; // e.g., "24"
-              const lastFour = match[2]; // e.g., "3094"
-              rollNumber = `${firstTwo}k-${lastFour}`; // e.g., "24k-3094"
-            }
-          }
-
-          return {
-            ...student,
-            rollNum: rollNumber,
-          };
-        });
+        </>
       }
-
-      setStudents(studentData);
-
-      // ✅ Safely calculate stats
-      setStats({
-        totalStudents: Array.isArray(studentData) ? studentData.length : 0,
-        totalTeachers: Array.isArray(teacherData) ? teacherData.length : 0,
-        totalDepartments: Array.isArray(deptData) ? deptData.length : 0,
-        pendingGroups: Array.isArray(pendingData) ? pendingData.length : 0,
-      });
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Approve Group - Generate password and send email
-  const handleApproveGroup = async (group: StudentGroup) => {
-    // Generate random password
-    const generatedPassword = generateRandomPassword();
-
-    try {
-      const response = await fetch("/api/admin/approve-group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId: group.groupId,
-          password: generatedPassword,
-        }),
-      });
-
-      if (response.ok) {
-        // Show credentials modal
-        setShowCredentials({ show: true, group, password: generatedPassword });
-        fetchDashboardData(); // Refresh data
-      }
-    } catch (error) {
-      console.error("Error approving group:", error);
-    }
-  };
-
-  const handleRejectGroup = (groupId: number) => {
-    setRejectModal({ show: true, groupId, reason: "" });
-  };
-
-  const handleConfirmRejection = async () => {
-    const { groupId, reason } = rejectModal;
-
-    if (!groupId) return;
-
-    // Validate reason
-    if (!reason.trim()) {
-      alert("Please enter a reason for rejection.");
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/admin/reject-group", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, reason: reason.trim() }),
-      });
-
-      if (response.ok) {
-        setRejectModal({ show: false, groupId: null, reason: "" });
-        fetchDashboardData();
-        alert(
-          "Group rejected successfully. Notification email sent to leader.",
-        );
-      } else {
-        const data = await response.json();
-        alert(data.message || "Failed to reject group");
-      }
-    } catch (error) {
-      console.error("Error rejecting group:", error);
-      alert("Network error. Please try again.");
-    }
-  };
-
-  const handleCancelRejection = () => {
-    setRejectModal({ show: false, groupId: null, reason: "" });
-  };
-
-  // Generate random password
-  const generateRandomPassword = () => {
-    const chars =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let password = "";
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  };
-
-  // View Group Members
-  const handleViewGroup = async (group: StudentGroup) => {
-    try {
-      // Fetch members
-      const membersRes = await fetch(
-        `/api/student/group/members?groupId=${group.groupId}`,
-      );
-      const membersData = await membersRes.json();
-      const members = Array.isArray(membersData) ? membersData : [membersData];
-
-      // Fetch project details
-      const projectRes = await fetch(
-        `/api/student/group/project?groupId=${group.groupId}`,
-      );
-      const projectData = await projectRes.json();
-      const rawProject = Array.isArray(projectData)
-        ? projectData[0]
-        : projectData;
-
-      // Map the project data to a consistent format
-      // ✅ Use undefined instead of null
-      const projectDetails = rawProject
-        ? {
-            PROJECTID: rawProject.PROJECTID || rawProject.projectId,
-            domains:
-              rawProject.DOMAIN || rawProject.domains || rawProject.DOMAINS,
-            PROJECTTITLE: rawProject.PROJECTTITLE || rawProject.projectTitle,
-            PROPOSALDOCUMENT:
-              rawProject.PROPOSALDOCUMENT || rawProject.proposalDocument,
-          }
-        : undefined;
-
-      console.log("Project details mapped:", projectDetails);
-
-      // Combine group data with members and project details
-      const fullGroupData = {
-        ...group,
-        members: members,
-        projectDetails: projectDetails,
-      };
-
-      console.log("Full group data:", fullGroupData);
-      setShowGroupModal({ show: true, group: fullGroupData });
-    } catch (error) {
-      console.error("Error fetching group details:", error);
-    }
-  };
-
-  const handleAssignJury = async (groupId: number) => {
-    try {
-      const response = await fetch("/api/admin/assign-jury", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        alert(
-          `Jury assigned!\nSenior: ${data.data.seniorTeacher}\nJunior: ${data.data.juniorTeacher}`,
-        );
-        fetchDashboardData(); // Refresh the list
-      } else {
-        alert(data.message || "Failed to assign jury");
-      }
-    } catch (error) {
-      console.error("Error assigning jury:", error);
-      alert("Network error");
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    router.push("/login");
-  };
-
-  const handleAddTeacher = async (teacherData: any) => {
-    try {
-      const response = await fetch("/api/admin/teachers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(teacherData),
-      });
-
-      if (response.ok) {
-        // Refresh the teachers list
-        fetchDashboardData();
-        // Close the modal
-        setShowTeacherModal(false);
-      } else {
-        const error = await response.json();
-        console.error("Error adding teacher:", error);
-        // Optionally show error message to user
-      }
-    } catch (error) {
-      console.error("Network error:", error);
-    }
-  };
-
-  // Add this state to your admin dashboard component
-
-  // Updated handleAutoSchedule - now receives dates as parameters
-  const handleAutoSchedule = async (startDate: string, endDate: string) => {
-    setScheduling(true);
-    try {
-      const response = await fetch("/api/admin/auto-schedule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startDate: startDate,
-          endDate: endDate,
-          startTime: "08:00:00",
-        endTime: "16:00:00",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert(
-          `✅ Scheduling Complete!\n\nScheduled: ${data.summary?.assignedCount || 0}\nFailed: ${data.summary?.unassignedCount || 0}`,
-        );
-        fetchDashboardData();
-        setShowScheduleModal(false);
-        setScheduleDates({ startDate: "", endDate: "" });
-      } else {
-        alert("Scheduling failed: " + data.message);
-      }
-    } catch (error) {
-      console.error("Scheduling error:", error);
-      alert("Network error during scheduling");
-    } finally {
-      setScheduling(false);
-    }
-  };
-
-  // Open modal
-  const openScheduleModal = () => {
-    setShowScheduleModal(true);
-  };
-
-  // Close modal
-  const closeScheduleModal = () => {
-    setShowScheduleModal(false);
-    setScheduleDates({ startDate: "", endDate: "" });
-  };
-
-  // ============================================
-  // UI Components
-  // ============================================
-
-  const StatCard = ({ title, value, icon: Icon, color }: any) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-800">{value}</p>
-        </div>
-        <div
-          className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}
-        >
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-    </div>
-  );
-
-  const Sidebar = () => (
-    <div
-      className={`${sidebarCollapsed ? "w-20" : "w-64"} bg-[#1A237E] h-screen fixed left-0 top-0 transition-all duration-300 z-20`}
     >
-      <div className="p-4 border-b border-[#3F51B5]/30">
-        <div className="flex items-center justify-between">
-          {!sidebarCollapsed && (
-            <div>
-              <h1 className="text-white font-bold text-lg">FYP Admin</h1>
-              <p className="text-[#9FA8DA] text-xs">Dashboard</p>
-            </div>
-          )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="text-[#9FA8DA] hover:text-white transition-colors"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="md:col-span-2">
+          <label className={labelBase}>Full Name *</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className={inputBase}
+            placeholder="Dr. Ayesha Khan"
+            autoFocus
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelBase}>Email *</label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            className={inputBase}
+            placeholder="teacher@university.edu"
+          />
+        </div>
+        <div>
+          <label className={labelBase}>Department *</label>
+          <select
+            value={formData.department}
+            onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+            className={inputBase}
           >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <ChevronLeft className="w-5 h-5" />
-            )}
-          </button>
+            <option value="">Select department</option>
+            {departments.map((dept) => (
+              <option key={dept.deptId} value={dept.name}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelBase}>Specialization *</label>
+          <input
+            type="text"
+            value={formData.specialization}
+            onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+            className={inputBase}
+            placeholder="Machine Learning"
+          />
+        </div>
+        <div>
+          <label className={labelBase}>Qualification *</label>
+          <input
+            type="text"
+            value={formData.qualification}
+            onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
+            className={inputBase}
+            placeholder="PhD"
+          />
+        </div>
+        <div>
+          <label className={labelBase}>Experience (years) *</label>
+          <input
+            type="number"
+            value={formData.experience}
+            onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+            className={inputBase}
+            placeholder="5"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelBase}>Jury Role *</label>
+          <select
+            value={formData.role}
+            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+            className={inputBase}
+          >
+            <option value="junior">Junior</option>
+            <option value="senior">Senior</option>
+          </select>
         </div>
       </div>
-
-      <nav className="p-4 space-y-2">
-        <button
-          onClick={() => setActiveTab("pending")}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            activeTab === "pending"
-              ? "bg-[#3F51B5] text-white"
-              : "text-[#9FA8DA] hover:bg-[#3F51B5]/20"
-          }`}
-        >
-          <AlertCircle className="w-5 h-5" />
-          {!sidebarCollapsed && <span>Pending Groups</span>}
-          {!sidebarCollapsed && stats.pendingGroups > 0 && (
-            <span className="ml-auto bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
-              {stats.pendingGroups}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("verified")}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            activeTab === "verified"
-              ? "bg-[#3F51B5] text-white"
-              : "text-[#9FA8DA] hover:bg-[#3F51B5]/20"
-          }`}
-        >
-          <CheckCircle className="w-5 h-5" />
-          {!sidebarCollapsed && <span>Verified Groups</span>}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("departments")}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            activeTab === "departments"
-              ? "bg-[#3F51B5] text-white"
-              : "text-[#9FA8DA] hover:bg-[#3F51B5]/20"
-          }`}
-        >
-          <BookOpen className="w-5 h-5" />
-          {!sidebarCollapsed && <span>Departments</span>}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("teachers")}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            activeTab === "teachers"
-              ? "bg-[#3F51B5] text-white"
-              : "text-[#9FA8DA] hover:bg-[#3F51B5]/20"
-          }`}
-        >
-          <Users className="w-5 h-5" />
-          {!sidebarCollapsed && <span>Teachers</span>}
-        </button>
-
-        <button
-          onClick={() => setActiveTab("students")}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-            activeTab === "students"
-              ? "bg-[#3F51B5] text-white"
-              : "text-[#9FA8DA] hover:bg-[#3F51B5]/20"
-          }`}
-        >
-          <GraduationCap className="w-5 h-5" />
-          {!sidebarCollapsed && <span>Students</span>}
-        </button>
-      </nav>
-      <button
-  onClick={() => setActiveTab('settings')}
-  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-    activeTab === 'settings' ? 'bg-[#3F51B5] text-white shadow-lg' : 'text-[#9FA8DA] hover:bg-white/10 hover:text-white'
-  }`}
->
-  <Settings className="w-5 h-5" />
-  {!sidebarCollapsed && <span className="text-sm font-medium">Settings</span>}
-</button>
-
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#3F51B5]/30">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#9FA8DA] hover:bg-red-500/20 hover:text-red-300 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          {!sidebarCollapsed && <span>Logout</span>}
-        </button>
-      </div>
-    </div>
+    </ModalShell>
   );
-
-  // ============================================
-  // Students Tab
-  // ============================================
-  // ============================================
-  // Verified Groups Tab
-  // ============================================
-  const VerifiedGroupsTab = () => (
-  <div className="space-y-4">
-    {verifiedGroups.length === 0 ? (
-      <div className="bg-white rounded-lg shadow p-8 text-center">
-        <CheckCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-        <h3 className="text-lg font-medium text-gray-800">
-          No Verified Groups
-        </h3>
-        <p className="text-gray-500">No groups have been verified yet.</p>
-      </div>
-    ) : (
-      verifiedGroups.map((group) => (
-        <div
-          key={group.groupId}
-          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
-        >
-          <div className="p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              {/* Left side - Group Info */}
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-800 text-lg">
-                  {group.groupUsername}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Leader: {group.leaderEmail}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Supervisor: {group.supervisorEmail}
-                </p>
-                <div className="flex items-center gap-3 mt-2">
-                  <p className="text-sm text-green-600 flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" />
-                    Verified
-                  </p>
-                  {/* Show jury status */}
-                  {group.juryId ? (
-                    <p className="text-sm text-purple-600 flex items-center gap-1">
-                      <UserCheck className="w-4 h-4" />
-                      Jury Assigned
-                    </p>
-                  ) : (
-                    <p className="text-sm text-orange-500 flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      Pending Jury
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Right side - Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleViewGroup(group)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium shadow-sm"
-                >
-                  View Details
-                </button>
-                
-                {/* ✅ Only show Assign Jury button if no jury is assigned */}
-                {!group.juryId && (
-                  <button
-                    onClick={() => handleAssignJury(group.groupId)}
-                    style={{ backgroundColor: "#da627d" }}
-                    className="px-4 py-2 bg-rose-400 text-white rounded-lg hover:bg-rose-500 transition-colors text-sm font-medium flex items-center gap-2 shadow-sm"
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    Assign Jury
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ))
-    )}
-  </div>
-);
-
-  // ============================================
-  // Departments Tab
-  // ============================================
-  const DepartmentsTab = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="text-left p-4 font-medium text-gray-600">ID</th>
-            <th className="text-left p-4 font-medium text-gray-600">
-              Department Name
-            </th>
-            <th className="text-left p-4 font-medium text-gray-600">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {departments.length === 0 ? (
-            <tr>
-              <td colSpan={3} className="text-center p-8 text-gray-500">
-                No departments found. Click "Add Department" to create one.
-              </td>
-            </tr>
-          ) : (
-            departments.map((dept) => (
-              <tr
-                key={dept.deptId}
-                className="border-t border-gray-100 hover:bg-gray-50"
-              >
-                <td className="p-4">{dept.deptId}</td>
-                <td className="p-4 font-medium">{dept.name}</td>
-                <td className="p-4">
-                  <button
-                    onClick={() => deleteDepartment(dept.deptId)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  // ============================================
-  // Teachers Tab
-  // ============================================
-  const TeachersTab = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="text-left p-4 font-medium text-gray-600">ID</th>
-            <th className="text-left p-4 font-medium text-gray-600">Name</th>
-            <th className="text-left p-4 font-medium text-gray-600">Email</th>
-            <th className="text-left p-4 font-medium text-gray-600">
-              Department
-            </th>
-            <th className="text-left p-4 font-medium text-gray-600">
-              Specialization
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {teachers.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="text-center p-8 text-gray-500">
-                No teachers found. Click "Add Teacher" to create one.
-              </td>
-            </tr>
-          ) : (
-            teachers.map((teacher) => (
-              <tr
-                key={teacher.TeacherId}
-                className="border-t border-gray-100 hover:bg-gray-50"
-              >
-                <td className="p-4">{teacher.TeacherId}</td>
-                <td className="p-4 font-medium">{teacher.name}</td>
-                <td className="p-4 text-gray-500">{teacher.email}</td>
-                <td className="p-4">
-                  {departments.map((dept) => {
-                    return dept.deptId === teacher.deptId ? dept.name : "";
-                  })}
-                </td>
-                <td className="p-4">{teacher.specialization}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  // ============================================
-  // Students Tab
-  // ============================================
-  const StudentsTab = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <table className="w-full">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="text-left p-4 font-medium text-gray-600">ID</th>
-            <th className="text-left p-4 font-medium text-gray-600">Name</th>
-            <th className="text-left p-4 font-medium text-gray-600">Roll No</th>
-            <th className="text-left p-4 font-medium text-gray-600">Email</th>
-            <th className="text-left p-4 font-medium text-gray-600">Section</th>
-            <th className="text-left p-4 font-medium text-gray-600">Batch</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="text-center p-8 text-gray-500">
-                No students found.
-              </td>
-            </tr>
-          ) : (
-            students.map((student) => (
-              <tr
-                key={student.stdId}
-                className="border-t border-gray-100 hover:bg-gray-50"
-              >
-                <td className="p-4">{student.stdId}</td>
-                <td className="p-4 font-medium">{student.name}</td>
-                <td className="p-4">{student.rollNum}</td>
-                <td className="p-4 text-gray-500">{student.email}</td>
-                <td className="p-4">{student.section}</td>
-                <td className="p-4">{student.batch}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-
-  // ============================================
-  // Add Department Handler
-  // ============================================
- // ✅ CORRECT - Accept the name parameter from the modal
-const handleAddDepartment = async (deptName: string) => {
-  console.log("Adding department with name:", deptName);
-  
-  if (!deptName || deptName.trim() === "") {
-    alert("Department name cannot be empty");
-    return;
-  }
-  
-  try {
-    const response = await fetch("/api/admin/departments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: deptName.trim() }),
-    });
-
-    if (response.ok) {
-      fetchDashboardData();
-      setShowDepartmentModal(false);
-      setDepartmentForm({ name: "" });
-    } else {
-      const data = await response.json();
-      alert(data.message || "Failed to add department");
-    }
-  } catch (error) {
-    console.error("Error adding department:", error);
-    alert("Network error");
-  }
 };
 
-  const deleteDepartment = async (id: Number) => {
-    try {
-      const response = await fetch("/api/admin/departments/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deptId: id }),
-      });
-      if (response.ok) {
-        fetchDashboardData();
-        console.log("Department deleted");
-      }
-    } catch (error) {
-      console.error("Error deleting department: ", error);
-    }
-  };
+/* ============================================================
+   PROFILE TAB
+   ============================================================ */
 
-  // ============================================
-  // Pending Groups Tab
-  // ============================================
-  const PendingGroupsTab = () => (
-    <div className="space-y-4">
-      {pendingGroups.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-800">
-            No Pending Groups
-          </h3>
-          <p className="text-gray-500">All groups have been reviewed.</p>
+const ProfileTab = ({ user }: { user: any }) => {
+  const name = user?.name || "Admin";
+  const email = user?.email || "admin@fyp.com";
+  const initials = name.slice(0, 2).toUpperCase();
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <Card className="lg:col-span-1 p-6 flex flex-col items-center text-center">
+        <div className="w-20 h-20 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-2xl font-semibold">
+          {initials}
         </div>
-      ) : (
-        pendingGroups.map((group) => (
-          <div
-            key={group.groupId}
-            className="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden"
-          >
-            <div className="p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-gray-800 text-lg">
-                    {group.groupUsername}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    Leader: {group.leaderEmail}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Supervisor: {group.supervisorEmail}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleViewGroup(group)}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => handleApproveGroup(group)}
-                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center gap-1"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleRejectGroup(group.groupId)}
-                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm flex items-center gap-1"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Reject
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-
-  // ============================================
-  // Modern Rejection Modal
-  // ============================================
-  const RejectionModal = () => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-              <XCircle className="w-4 h-4 text-red-600" />
-            </div>
-            <h3 className="text-md font-semibold text-gray-800">
-              Reject Group
-            </h3>
-          </div>
-          <button
-            onClick={handleCancelRejection}
-            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
+        <h3 className="mt-4 text-lg font-semibold text-slate-900">{name}</h3>
+        <p className="text-sm text-slate-500">{email}</p>
+        <div className="mt-3">
+          <Badge tone="indigo">
+            <Shield className="w-3 h-3" /> Administrator
+          </Badge>
         </div>
+      </Card>
 
-        {/* Modal Body */}
-        <div className="p-5 space-y-4">
-          {/* Warning Banner */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-xs text-red-700">
-              ⚠️ This action cannot be undone. The group leader will be notified
-              via email.
-            </p>
-          </div>
-
-          {/* Reason Input */}
+      <Card className="lg:col-span-2">
+        <SectionHeader
+          title="Account Information"
+          subtitle="Read-only details from your admin account"
+          icon={User}
+        />
+        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Reason for Rejection *
-            </label>
+            <label className={labelBase}>Username</label>
+            <input value={name} disabled className={`${inputBase} bg-slate-50 text-slate-500`} />
+          </div>
+          <div>
+            <label className={labelBase}>Email</label>
+            <input value={email} disabled className={`${inputBase} bg-slate-50 text-slate-500`} />
+          </div>
+          <div>
+            <label className={labelBase}>Role</label>
             <input
-              value={rejectModal.reason}
-              onChange={(e) =>
-                setRejectModal((prev) => ({ ...prev, reason: e.target.value }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-gray-700"
-              placeholder="Please provide a clear reason for rejection..."
-              autoFocus
-              dir="ltr"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              This reason will be sent to the group leader's email.
-            </p>
-          </div>
-
-          {/* Quick Suggestions */}
-          <div>
-            <p className="text-xs text-gray-500 mb-2">Quick suggestions:</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                "Insufficient group members",
-                "Invalid email format",
-                "Project domain mismatch",
-                "Incomplete application",
-                "Supervisor not available",
-                "Duplicate registration",
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  onClick={() =>
-                    setRejectModal((prev) => ({ ...prev, reason: suggestion }))
-                  }
-                  className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button
-            onClick={handleCancelRejection}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirmRejection}
-            disabled={!rejectModal.reason.trim()}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            Confirm Rejection
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ============================================
-  // View Group Modal
-  // ============================================
-  const ViewGroupModal = () => {
-    const groupData = showGroupModal.group;
-
-    if (!groupData) return null;
-
-    // Get project details from the combined data
-    const project = groupData.projectDetails;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-          {/* Modal Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex justify-between items-center">
-            <div>
-              <h3 className="text-2xl font-bold text-gray-800">
-                Group Details
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Complete information about the group and its members
-              </p>
-            </div>
-            <button
-              onClick={() => setShowGroupModal({ show: false, group: null })}
-              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <X className="w-6 h-6 text-gray-400" />
-            </button>
-          </div>
-
-          {/* Modal Body */}
-          <div className="px-8 py-8 space-y-8">
-            {/* Group Information Section */}
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-800">
-                    Group Information
-                  </h4>
-                  <p className="text-sm text-gray-500">
-                    Basic group details and project information
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 rounded-2xl p-6">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Group Username
-                  </p>
-                  <p className="text-base font-semibold text-gray-900">
-                    {groupData.groupUsername}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Leader Email
-                  </p>
-                  <p className="text-base text-gray-800 break-all">
-                    {groupData.leaderEmail}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Supervisor
-                  </p>
-                  <p className="text-base text-gray-800">
-                    {groupData.supervisorEmail || "Not Assigned"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Project Details Section - Using fetched project data */}
-            {/* Project Details Section */}
-            {groupData.projectDetails && (
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800">
-                      Project Details
-                    </h4>
-                    <p className="text-sm text-gray-500">
-                      Project information and domains
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-6 bg-gray-50 rounded-2xl p-6">
-                  <div className="grid grid-cols-1 gap-4">
-                    {/* Project Title */}
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        Project Title
-                      </p>
-                      <p className="text-base font-semibold text-gray-900">
-                        {groupData.projectDetails.PROJECTTITLE ||
-                          "Not Submitted"}
-                      </p>
-                    </div>
-
-                    {/* Domains */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                        Domains
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {groupData.projectDetails.domains ? (
-                          groupData.projectDetails.domains
-                            .split(",")
-                            .map((domain: string, idx: number) => (
-                              <span
-                                key={idx}
-                                className="px-3 py-1.5 bg-white rounded-lg text-sm text-gray-600 shadow-sm border border-gray-200"
-                              >
-                                {domain.trim()}
-                              </span>
-                            ))
-                        ) : (
-                          <p className="text-gray-600">No domains selected</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Proposal Document */}
-                    {groupData.projectDetails.PROPOSALDOCUMENT && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                          Proposal Document
-                        </p>
-                        <a
-                          href={groupData.projectDetails.PROPOSALDOCUMENT}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1"
-                        >
-                          <FileText className="w-4 h-4" />
-                          View Proposal
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Status Section */}
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-800">
-                    Status
-                  </h4>
-                  <p className="text-sm text-gray-500">
-                    Current verification status
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-2xl p-6">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-3 h-3 rounded-full ${
-                        groupData.status === "VERIFIED"
-                          ? "bg-green-500"
-                          : groupData.status === "PENDING"
-                            ? "bg-yellow-500"
-                            : "bg-red-500"
-                      }`}
-                    ></div>
-                    <span
-                      className={`px-3 py-1.5 rounded-full text-sm font-semibold ${
-                        groupData.status === "VERIFIED"
-                          ? "bg-green-100 text-green-700"
-                          : groupData.status === "PENDING"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {groupData.status === "VERIFIED"
-                        ? "VERIFIED"
-                        : groupData.status === "PENDING"
-                          ? "PENDING APPROVAL"
-                          : "DENIED"}
-                    </span>
-                  </div>
-                  {groupData.juryId && (
-                    <div className="flex items-center gap-2">
-                      <UserCheck className="w-4 h-4 text-purple-500" />
-                      <span className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
-                        JURY ASSIGNED
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Members Section */}
-            <div>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-amber-600" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-gray-800">
-                    Group Members
-                  </h4>
-                  <p className="text-sm text-gray-500">
-                    Team members with their details
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-2xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
-                          #
-                        </th>
-                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
-                          Full Name
-                        </th>
-                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
-                          Email
-                        </th>
-                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
-                          Section
-                        </th>
-                        <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
-                          Batch
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupData.members && groupData.members.length > 0 ? (
-                        groupData.members.map((member: any, idx: number) => (
-                          <tr
-                            key={idx}
-                            className="border-t border-gray-200 hover:bg-white transition-colors"
-                          >
-                            <td className="px-6 py-4 text-gray-500 font-medium">
-                              {idx + 1}
-                            </td>
-                            <td className="px-6 py-4 font-semibold text-gray-800">
-                              {member.name}
-                            </td>
-                            <td className="px-6 py-4 text-gray-600 break-all">
-                              {member.email}
-                            </td>
-                            <td className="px-6 py-4 text-gray-600">
-                              {member.section || "-"}
-                            </td>
-                            <td className="px-6 py-4 text-gray-600">
-                              {member.batch || "-"}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="text-center py-16">
-                            <div className="flex flex-col items-center gap-3">
-                              <div className="w-16 h-16 bg-gray-200 rounded-2xl flex items-center justify-center">
-                                <Users className="w-8 h-8 text-gray-400" />
-                              </div>
-                              <p className="text-gray-500 font-medium">
-                                No members found
-                              </p>
-                              <p className="text-sm text-gray-400">
-                                This group has no members assigned
-                              </p>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Modal Footer */}
-          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-6 flex justify-end gap-4">
-            <button
-              onClick={() => setShowGroupModal({ show: false, group: null })}
-              className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-semibold"
-            >
-              Close
-            </button>
-            {groupData.status === "PENDING" && (
-              <div className="flex gap-3">
-                <button
-                  onClick={() => handleApproveGroup(groupData)}
-                  className="px-6 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm font-semibold flex items-center gap-2"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Approve Group
-                </button>
-                <button
-                  onClick={() => handleRejectGroup(groupData.groupId)}
-                  className="px-6 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm font-semibold flex items-center gap-2"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Reject Group
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Schedule Date Selection Modal
-  const ScheduleDateModal = () => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-green-600" />
-            </div>
-            <h3 className="text-md font-semibold text-gray-800">
-              Schedule Evaluation
-            </h3>
-          </div>
-          <button
-            onClick={closeScheduleModal}
-            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="p-5 space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-700">
-              📅 Select the date range for the evaluation schedule. All verified
-              groups will be automatically assigned to available time slots and
-              venues.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={scheduleDates.startDate}
-              onChange={(e) =>
-                setScheduleDates((prev) => ({
-                  ...prev,
-                  startDate: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              min={new Date().toISOString().split("T")[0]}
-              required
+              value={user?.role || "ADMIN"}
+              disabled
+              className={`${inputBase} bg-slate-50 text-slate-500`}
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date <span className="text-red-500">*</span>
-            </label>
+            <label className={labelBase}>Portal</label>
             <input
-              type="date"
-              value={scheduleDates.endDate}
-              onChange={(e) =>
-                setScheduleDates((prev) => ({
-                  ...prev,
-                  endDate: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              min={
-                scheduleDates.startDate ||
-                new Date().toISOString().split("T")[0]
-              }
-              required
+              value="FYP / MS Thesis Portal"
+              disabled
+              className={`${inputBase} bg-slate-50 text-slate-500`}
             />
           </div>
-
-          {/* Date range summary */}
-          {scheduleDates.startDate && scheduleDates.endDate && (
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-600">
-                📊 <span className="font-medium">Range Summary:</span>
-                <br />
-                From: {new Date(scheduleDates.startDate).toLocaleDateString()}
-                <br />
-                To: {new Date(scheduleDates.endDate).toLocaleDateString()}
-                <br />
-                Duration:{" "}
-                {Math.ceil(
-                  (new Date(scheduleDates.endDate).getTime() -
-                    new Date(scheduleDates.startDate).getTime()) /
-                    (1000 * 60 * 60 * 24),
-                ) + 1}{" "}
-                days
-              </p>
-            </div>
-          )}
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <p className="text-xs text-yellow-700">
-              ⚠️ <span className="font-medium">Note:</span>
-              <br />
-              • This will schedule all verified groups without existing
-              schedules
-              <br />
-              • Time slots: 8:00 AM - 4:00 PM (50 min each)
-              <br />• Conflicts will be automatically handled
-            </p>
-          </div>
         </div>
-
-        {/* Modal Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button
-            onClick={closeScheduleModal}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() =>
-              handleAutoSchedule(scheduleDates.startDate, scheduleDates.endDate)
-            }
-            disabled={
-              !scheduleDates.startDate || !scheduleDates.endDate || scheduling
-            }
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {scheduling ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Scheduling...</span>
-              </>
-            ) : (
-              <>
-                <Calendar className="w-4 h-4" />
-                <span>Create Schedule</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      </Card>
     </div>
   );
+};
 
- // app/(dashboard)/admin/page.tsx - Add this component
+/* ============================================================
+   SETTINGS TAB
+   ============================================================ */
 
 const SettingsTab = () => {
   const [loading, setLoading] = useState(false);
@@ -1756,14 +539,12 @@ const SettingsTab = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Password form state
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
 
-  // Profile settings form
   const [adminSettings, setAdminSettings] = useState({
     username: "",
     email: "",
@@ -1771,7 +552,6 @@ const SettingsTab = () => {
     theme: "light",
   });
 
-  // Fetch admin profile on mount
   useEffect(() => {
     fetchAdminProfile();
   }, []);
@@ -1780,7 +560,6 @@ const SettingsTab = () => {
     setLoading(true);
     try {
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      // You can fetch admin details from API if needed
       setAdminSettings({
         username: storedUser.name || "Admin",
         email: storedUser.email || "admin@fyp.com",
@@ -1847,7 +626,6 @@ const SettingsTab = () => {
     e.preventDefault();
     setError("");
     setSuccess("");
-
     setSaving(true);
 
     try {
@@ -1866,7 +644,6 @@ const SettingsTab = () => {
 
       if (response.ok) {
         setSuccess("Settings updated successfully!");
-        // Update localStorage
         const user = JSON.parse(localStorage.getItem("user") || "{}");
         user.notifications = adminSettings.notifications;
         user.theme = adminSettings.theme;
@@ -1884,215 +661,169 @@ const SettingsTab = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-16">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#3F51B5] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading settings...</p>
+          <div className="w-10 h-10 border-[3px] border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-sm text-slate-500">Loading settings...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Success/Error Messages */}
+    <div className="space-y-5">
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
-          <CheckCircle className="w-5 h-5" />
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
+          <CheckCircle className="w-4 h-4" />
           {success}
         </div>
       )}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-5 h-5" />
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-sm text-rose-700">
+          <AlertCircle className="w-4 h-4" />
           {error}
         </div>
       )}
 
-      {/* Change Password Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-2">
-            <Lock className="w-5 h-5 text-[#3F51B5]" />
-            <h3 className="text-lg font-semibold text-gray-800">Change Password</h3>
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5">Update your login credentials</p>
-        </div>
-
-        <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
+      <Card>
+        <SectionHeader
+          title="Change Password"
+          subtitle="Update your login credentials"
+          icon={Lock}
+        />
+        <form onSubmit={handlePasswordChange} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Current Password
-            </label>
+            <label className={labelBase}>Current Password</label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="w-4 h-4 text-gray-400" />
-              </div>
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type={showCurrentPassword ? "text" : "password"}
                 value={passwordForm.currentPassword}
                 onChange={(e) =>
                   setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
                 }
-                className="w-full pl-9 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+                className={`${inputBase} pl-10 pr-10`}
                 placeholder="Enter current password"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                {showCurrentPassword ? (
-                  <EyeOff className="w-4 h-4 text-gray-400" />
-                ) : (
-                  <Eye className="w-4 h-4 text-gray-400" />
-                )}
+                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                New Password
-              </label>
+              <label className={labelBase}>New Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="w-4 h-4 text-gray-400" />
-                </div>
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type={showNewPassword ? "text" : "password"}
                   value={passwordForm.newPassword}
                   onChange={(e) =>
                     setPasswordForm({ ...passwordForm, newPassword: e.target.value })
                   }
-                  className="w-full pl-9 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+                  className={`${inputBase} pl-10 pr-10`}
                   placeholder="Enter new password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
-                  {showNewPassword ? (
-                    <EyeOff className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-gray-400" />
-                  )}
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm New Password
-              </label>
+              <label className={labelBase}>Confirm New Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="w-4 h-4 text-gray-400" />
-                </div>
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   value={passwordForm.confirmPassword}
                   onChange={(e) =>
                     setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
                   }
-                  className="w-full pl-9 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+                  className={`${inputBase} pl-10 pr-10`}
                   placeholder="Confirm new password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-gray-400" />
-                  )}
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-[#3F51B5] text-white rounded-lg hover:bg-[#5C6BC0] transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
+          <div className="flex justify-end pt-1">
+            <button type="submit" disabled={saving} className={btnPrimary}>
               <Save className="w-4 h-4" />
               {saving ? "Changing Password..." : "Change Password"}
             </button>
           </div>
         </form>
-      </div>
+      </Card>
 
-      {/* Profile Settings Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-[#3F51B5]" />
-            <h3 className="text-lg font-semibold text-gray-800">Account Settings</h3>
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5">Manage your account preferences</p>
-        </div>
-
-        <form onSubmit={handleSettingsUpdate} className="p-6 space-y-4">
+      <Card>
+        <SectionHeader
+          title="Preferences"
+          subtitle="Manage how the portal behaves for you"
+          icon={Settings}
+        />
+        <form onSubmit={handleSettingsUpdate} className="p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Username
-              </label>
+              <label className={labelBase}>Username</label>
               <input
                 type="text"
                 value={adminSettings.username}
                 disabled
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                className={`${inputBase} bg-slate-50 text-slate-500 cursor-not-allowed`}
               />
-              <p className="text-xs text-gray-400 mt-1">Username cannot be changed</p>
+              <p className="text-xs text-slate-400 mt-1.5">Username cannot be changed</p>
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className={labelBase}>Email</label>
               <input
                 type="email"
                 value={adminSettings.email}
                 disabled
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                className={`${inputBase} bg-slate-50 text-slate-500 cursor-not-allowed`}
               />
-              <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>
+              <p className="text-xs text-slate-400 mt-1.5">Email cannot be changed</p>
             </div>
           </div>
 
-          {/* Theme Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Theme Preference
-            </label>
+            <label className={labelBase}>Theme Preference</label>
             <select
               value={adminSettings.theme}
-              onChange={(e) =>
-                setAdminSettings({ ...adminSettings, theme: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+              onChange={(e) => setAdminSettings({ ...adminSettings, theme: e.target.value })}
+              className={inputBase}
             >
-              <option value="light">☀️ Light</option>
-              <option value="dark">🌙 Dark</option>
-              <option value="system">💻 System Default</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System Default</option>
             </select>
           </div>
 
-          {/* Notifications Toggle */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
             <div>
-              <p className="font-medium text-gray-800">Email Notifications</p>
-              <p className="text-sm text-gray-500">Receive notifications about system updates</p>
+              <p className="text-sm font-medium text-slate-800">Email Notifications</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Receive notifications about group submissions and schedules
+              </p>
             </div>
             <button
               type="button"
@@ -2102,174 +833,640 @@ const SettingsTab = () => {
                   notifications: !adminSettings.notifications,
                 })
               }
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                adminSettings.notifications ? "bg-[#3F51B5]" : "bg-gray-300"
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                adminSettings.notifications ? "bg-indigo-600" : "bg-slate-300"
               }`}
             >
               <span
-                className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                  adminSettings.notifications ? "translate-x-6" : ""
+                className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                  adminSettings.notifications ? "translate-x-5" : ""
                 }`}
               />
             </button>
           </div>
 
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-[#3F51B5] text-white rounded-lg hover:bg-[#5C6BC0] transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
+          <div className="flex justify-end pt-1">
+            <button type="submit" disabled={saving} className={btnPrimary}>
               <Save className="w-4 h-4" />
               {saving ? "Saving..." : "Save Settings"}
             </button>
           </div>
         </form>
-      </div>
+      </Card>
 
-      {/* Account Actions */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-red-500" />
-            <h3 className="text-lg font-semibold text-gray-800">Account Actions</h3>
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5">Advanced account management</p>
-        </div>
-
-        <div className="p-6 space-y-3">
+      <Card>
+        <SectionHeader
+          title="Account Actions"
+          subtitle="Advanced account management"
+          icon={Shield}
+        />
+        <div className="p-5 space-y-3">
           <button
             onClick={() => {
               if (confirm("Are you sure you want to log out from all devices?")) {
                 // Handle logout from all devices
               }
             }}
-            className="w-full text-left px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors flex items-center gap-3"
+            className="w-full text-left px-4 py-3.5 rounded-xl border border-amber-200 bg-amber-50/60 hover:bg-amber-50 transition-colors flex items-center gap-3"
           >
-            <LogOut className="w-5 h-5 text-yellow-600" />
+            <LogOut className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
-              <p className="font-medium text-gray-800">Logout from All Devices</p>
-              <p className="text-sm text-gray-500">End all active sessions</p>
+              <p className="text-sm font-medium text-slate-800">Logout from All Devices</p>
+              <p className="text-xs text-slate-500">End all active sessions</p>
             </div>
           </button>
 
           <button
             onClick={() => {
-              if (confirm("Are you sure you want to deactivate your account? This action cannot be undone.")) {
+              if (
+                confirm(
+                  "Are you sure you want to deactivate your account? This action cannot be undone.",
+                )
+              ) {
                 // Handle account deactivation
               }
             }}
-            className="w-full text-left px-4 py-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-3"
+            className="w-full text-left px-4 py-3.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-50 transition-colors flex items-center gap-3"
           >
-            <XCircle className="w-5 h-5 text-red-600" />
+            <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
             <div>
-              <p className="font-medium text-red-800">Deactivate Account</p>
-              <p className="text-sm text-red-500">Permanently deactivate your admin account</p>
+              <p className="text-sm font-medium text-rose-800">Deactivate Account</p>
+              <p className="text-xs text-rose-500">Permanently deactivate your admin account</p>
             </div>
           </button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };
 
-  // ============================================
-  // Credentials Modal
-  // ============================================
-  const CredentialsModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Group Credentials</h3>
-          <button
-            onClick={() =>
-              setShowCredentials({ show: false, group: null, password: "" })
+/* ============================================================
+   MAIN DASHBOARD
+   ============================================================ */
+
+export default function AdminDashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("pending");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [scheduling, setScheduling] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleDates, setScheduleDates] = useState({ startDate: "", endDate: "" });
+
+  // Data states
+  const [pendingGroups, setPendingGroups] = useState<StudentGroup[]>([]);
+  const [verifiedGroups, setVerifiedGroups] = useState<StudentGroup[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+
+  // Modal states
+  const [showGroupModal, setShowGroupModal] = useState<{
+    show: boolean;
+    group: ModalGroupData | null;
+  }>({ show: false, group: null });
+  const [rejectModal, setRejectModal] = useState<{
+    show: boolean;
+    groupId: number | null;
+    reason: string;
+  }>({ show: false, groupId: null, reason: "" });
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
+  const [showCredentials, setShowCredentials] = useState<{
+    show: boolean;
+    group: StudentGroup | null;
+    password: string;
+  }>({ show: false, group: null, password: "" });
+
+  const [departmentForm, setDepartmentForm] = useState({ name: "" });
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalDepartments: 0,
+    pendingGroups: 0,
+  });
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (!storedUser) {
+      router.push("/login");
+      return;
+    }
+    const parsedUser = JSON.parse(storedUser);
+    if (parsedUser.role !== "ADMIN") {
+      router.push("/login");
+      return;
+    }
+    setUser(parsedUser);
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const pendingRes = await fetch("/api/admin/groups?status=PENDING");
+      const pendingData = await pendingRes.json();
+      setPendingGroups(pendingData);
+
+      const verifiedRes = await fetch("/api/admin/groups?status=VERIFIED");
+      const verifiedData = await verifiedRes.json();
+      setVerifiedGroups(verifiedData);
+
+      const deptRes = await fetch("/api/admin/departments");
+      const deptData = await deptRes.json();
+      setDepartments(deptData);
+    
+
+      const teacherRes = await fetch("/api/admin/teachers");
+      const teacherData = await teacherRes.json();
+      setTeachers(teacherData);
+
+      const studentRes = await fetch("/api/admin/students");
+      let studentData = await studentRes.json();
+
+      if (Array.isArray(studentData)) {
+        studentData = studentData.map((student: any) => {
+          const email = student?.email || "";
+          let rollNumber = "";
+
+          if (email && typeof email === "string") {
+            const match = email.match(/k(\d{2})(\d{4})@/);
+            if (match) {
+              rollNumber = `${match[1]}k-${match[2]}`;
             }
-          >
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-          <p className="text-green-800 text-sm flex items-center gap-2">
-            <Mail className="w-4 h-4" />
-            Credentials have been sent to {showCredentials.group?.leaderEmail}
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Group Username
-            </label>
-            <input
-              type="text"
-              value={showCredentials.group?.groupUsername || ""}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={showCredentials.password}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 font-mono"
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Please share these credentials with the group leader.
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() =>
-            setShowCredentials({ show: false, group: null, password: "" })
           }
-          className="w-full mt-6 px-4 py-2 bg-[#3F51B5] text-white rounded-lg hover:bg-[#5C6BC0]"
-        >
-          Close
-        </button>
-      </div>
-    </div>
+
+          return { ...student, rollNum: rollNumber };
+        });
+      }
+
+      setStudents(studentData);
+
+      setStats({
+        totalStudents: Array.isArray(studentData) ? studentData.length : 0,
+        totalTeachers: Array.isArray(teacherData) ? teacherData.length : 0,
+        totalDepartments: Array.isArray(deptData) ? deptData.length : 0,
+        pendingGroups: Array.isArray(pendingData) ? pendingData.length : 0,
+      });
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ---------------- Handlers (unchanged logic) ---------------- */
+
+  const generateRandomPassword = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let password = "";
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const handleApproveGroup = async (group: StudentGroup) => {
+    const generatedPassword = generateRandomPassword();
+    try {
+      const response = await fetch("/api/admin/approve-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: group.groupId, password: generatedPassword }),
+      });
+
+      if (response.ok) {
+        setShowGroupModal({ show: false, group: null });
+        setShowCredentials({ show: true, group, password: generatedPassword });
+        fetchDashboardData();
+      }
+    } catch (error) {
+      console.error("Error approving group:", error);
+    }
+  };
+
+  const handleRejectGroup = (groupId: number) => {
+    setRejectModal({ show: true, groupId, reason: "" });
+  };
+
+  const handleConfirmRejection = async () => {
+    const { groupId, reason } = rejectModal;
+    if (!groupId) return;
+
+    if (!reason.trim()) {
+      alert("Please enter a reason for rejection.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/reject-group", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId, reason: reason.trim() }),
+      });
+
+      if (response.ok) {
+        setRejectModal({ show: false, groupId: null, reason: "" });
+        fetchDashboardData();
+        alert("Group rejected successfully. Notification email sent to leader.");
+      } else {
+        const data = await response.json();
+        alert(data.message || "Failed to reject group");
+      }
+    } catch (error) {
+      console.error("Error rejecting group:", error);
+      alert("Network error. Please try again.");
+    }
+  };
+
+  const handleCancelRejection = () => {
+    setRejectModal({ show: false, groupId: null, reason: "" });
+  };
+
+  const handleViewGroup = async (group: StudentGroup) => {
+    try {
+      const membersRes = await fetch(`/api/student/group/members?groupId=${group.groupId}`);
+      const membersData = await membersRes.json();
+      const members = Array.isArray(membersData) ? membersData : [membersData];
+
+      const projectRes = await fetch(`/api/student/group/project?groupId=${group.groupId}`);
+      const projectData = await projectRes.json();
+      const rawProject = Array.isArray(projectData) ? projectData[0] : projectData;
+
+      const projectDetails = rawProject
+        ? {
+            PROJECTID: rawProject.PROJECTID || rawProject.projectId,
+            domains: rawProject.DOMAIN || rawProject.domains || rawProject.DOMAINS,
+            PROJECTTITLE: rawProject.PROJECTTITLE || rawProject.projectTitle,
+            PROPOSALDOCUMENT: rawProject.PROPOSALDOCUMENT || rawProject.proposalDocument,
+          }
+        : undefined;
+
+      setShowGroupModal({
+        show: true,
+        group: { ...group, members, projectDetails },
+      });
+    } catch (error) {
+      console.error("Error fetching group details:", error);
+    }
+  };
+
+  const handleAssignJury = async (groupId: number) => {
+    try {
+      const response = await fetch("/api/admin/assign-jury", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(
+          `Jury assigned!\nSenior: ${data.data.seniorTeacher}\nJunior: ${data.data.juniorTeacher}`,
+        );
+        fetchDashboardData();
+      } else {
+        alert(data.message || "Failed to assign jury");
+      }
+    } catch (error) {
+      console.error("Error assigning jury:", error);
+      alert("Network error");
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    router.push("/login");
+  };
+
+  const handleAddTeacher = async (teacherData: any) => {
+    try {
+      const response = await fetch("/api/admin/teachers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(teacherData),
+      });
+
+      if (response.ok) {
+        fetchDashboardData();
+        setShowTeacherModal(false);
+      } else {
+        const error = await response.json();
+        console.error("Error adding teacher:", error);
+      }
+    } catch (error) {
+      console.error("Network error:", error);
+    }
+  };
+
+  const handleAddDepartment = async (deptName: string) => {
+    if (!deptName || deptName.trim() === "") {
+      alert("Department name cannot be empty");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/departments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: deptName.trim() }),
+      });
+
+      if (response.ok) {
+        fetchDashboardData();
+        setShowDepartmentModal(false);
+        setDepartmentForm({ name: "" });
+      } else {
+        const data = await response.json();
+        alert(data.message || "Failed to add department");
+      }
+    } catch (error) {
+      console.error("Error adding department:", error);
+      alert("Network error");
+    }
+  };
+
+  const deleteDepartment = async (id: number) => {
+    try {
+      const response = await fetch("/api/admin/departments/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deptId: id }),
+      });
+      if (response.ok) fetchDashboardData();
+    } catch (error) {
+      console.error("Error deleting department: ", error);
+    }
+  };
+
+  const handleAutoSchedule = async (startDate: string, endDate: string) => {
+    setScheduling(true);
+    try {
+      const response = await fetch("/api/admin/auto-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          startTime: "08:00:00",
+          endTime: "16:00:00",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(
+          `Scheduling complete!\n\nScheduled: ${data.summary?.assignedCount || 0}\nFailed: ${
+            data.summary?.unassignedCount || 0
+          }`,
+        );
+        fetchDashboardData();
+        setShowScheduleModal(false);
+        setScheduleDates({ startDate: "", endDate: "" });
+      } else {
+        alert("Scheduling failed: " + data.message);
+      }
+    } catch (error) {
+      console.error("Scheduling error:", error);
+      alert("Network error during scheduling");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const openScheduleModal = () => setShowScheduleModal(true);
+  const closeScheduleModal = () => {
+    setShowScheduleModal(false);
+    setScheduleDates({ startDate: "", endDate: "" });
+  };
+
+  /* ---------------- Search filtering ---------------- */
+
+  const q = searchTerm.trim().toLowerCase();
+  const match = (...values: any[]) =>
+    !q || values.some((v) => String(v ?? "").toLowerCase().includes(q));
+
+  const filteredPending = useMemo(
+    () =>
+      (pendingGroups || []).filter((g) =>
+        match(g.groupUsername, g.leaderEmail, g.supervisorEmail),
+      ),
+    [pendingGroups, q],
   );
+  const filteredVerified = useMemo(
+    () =>
+      (verifiedGroups || []).filter((g) =>
+        match(g.groupUsername, g.leaderEmail, g.supervisorEmail),
+      ),
+    [verifiedGroups, q],
+  );
+  const filteredStudents = useMemo(
+    () =>
+      (students || []).filter((s) =>
+        match(s.name, s.email, s.rollNum, s.section, s.batch),
+      ),
+    [students, q],
+  );
+  const filteredTeachers = useMemo(
+    () => (teachers || []).filter((t) => match(t.name, t.email, t.specialization)),
+    [teachers, q],
+  );
+  const filteredDepartments = useMemo(
+    () => (departments || []).filter((d) => match(d.name, d.deptId)),
+    [departments, q],
+  );
+
+  const deptName = (id: number) =>
+    departments.find((d) => d.deptId === id)?.name || "—";
+
+  /* ---------------- Sidebar ---------------- */
+
+  const navItems: {
+    key: TabType;
+    label: string;
+    icon: any;
+    badge?: number;
+  }[] = [
+    { key: "pending", label: "Pending Groups", icon: ClipboardList, badge: stats.pendingGroups },
+    { key: "verified", label: "Verified Groups", icon: CheckCircle },
+    { key: "students", label: "Students", icon: GraduationCap },
+    { key: "departments", label: "Departments", icon: Building2 },
+    { key: "teachers", label: "Teachers", icon: Users },
+    { key: "profile", label: "Profile", icon: User },
+    { key: "settings", label: "Settings", icon: Settings },
+  ];
+
+  const pageTitle: Record<TabType, string> = {
+    pending: "Pending Groups",
+    verified: "Verified Groups",
+    students: "Students",
+    departments: "Departments",
+    teachers: "Teachers",
+    profile: "Profile",
+    settings: "Settings",
+  };
+
+  const pageSubtitle: Record<TabType, string> = {
+    pending: "Review and verify newly registered FYP / MS thesis groups",
+    verified: "Assign juries and schedule evaluations for verified groups",
+    students: "All registered students in the portal",
+    departments: "Academic departments used across the portal",
+    teachers: "Faculty available for jury assignment",
+    profile: "Your administrator account overview",
+    settings: "Security and preference settings",
+  };
+
+  /* ---------------- Loading ---------------- */
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#F7F8FB] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#3F51B5] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className="w-10 h-10 border-[3px] border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="mt-4 text-sm text-slate-500">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
+  const adminName = user?.name || "Admin";
+  const adminEmail = user?.email || "admin@fyp.com";
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-
-      <div
-        className={`${sidebarCollapsed ? "ml-20" : "ml-64"} transition-all duration-300`}
+    <div className="min-h-screen bg-[#F7F8FB] text-slate-800">
+      {/* ================= SIDEBAR ================= */}
+      <aside
+        className={`${
+          sidebarCollapsed ? "w-[76px]" : "w-64"
+        } fixed left-0 top-0 h-screen bg-white border-r border-slate-200 flex flex-col transition-all duration-300 z-30`}
       >
-        {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">
-              {activeTab === "pending" && "Pending Groups"}
-              {activeTab === "verified" && "Verified Groups"}
-              {activeTab === "departments" && "Departments"}
-              {activeTab === "teachers" && "Teachers"}
-              {activeTab === "students" && "Students"}
-              {activeTab === "settings" && "Settings"}
-            </h2>
+        {/* Brand */}
+        <div className="h-16 px-4 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <span className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+              <LayoutGrid className="w-[18px] h-[18px]" />
+            </span>
+            {!sidebarCollapsed && (
+              <div className="leading-tight">
+                <p className="text-[15px] font-bold text-slate-900">FYP Portal</p>
+                <p className="text-[11px] text-slate-400">Admin Console</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronLeft className="w-4 h-4" />
+            )}
+          </button>
+        </div>
 
-            {/* Add buttons for departments and teachers */}
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          {!sidebarCollapsed && (
+            <p className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Management
+            </p>
+          )}
+          {navItems.map((item) => {
+            const active = activeTab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setActiveTab(item.key)}
+                title={sidebarCollapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <item.icon
+                  className={`w-[18px] h-[18px] shrink-0 ${
+                    active ? "text-indigo-600" : "text-slate-400"
+                  }`}
+                />
+                {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                {!sidebarCollapsed && !!item.badge && item.badge > 0 && (
+                  <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* User + logout */}
+        <div className="p-3 border-t border-slate-100">
+          <div
+            className={`flex items-center gap-3 px-2 py-2 rounded-xl ${
+              sidebarCollapsed ? "justify-center" : ""
+            }`}
+          >
+            <span className="w-9 h-9 rounded-xl bg-slate-900 text-white text-xs font-semibold flex items-center justify-center shrink-0">
+              {adminName.slice(0, 2).toUpperCase()}
+            </span>
+            {!sidebarCollapsed && (
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800 truncate">{adminName}</p>
+                <p className="text-[11px] text-slate-400 truncate">{adminEmail}</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleLogout}
+            className={`mt-1 w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors ${
+              sidebarCollapsed ? "justify-center" : ""
+            }`}
+          >
+            <LogOut className="w-[18px] h-[18px] shrink-0" />
+            {!sidebarCollapsed && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* ================= MAIN ================= */}
+      <div className={`${sidebarCollapsed ? "ml-[76px]" : "ml-64"} transition-all duration-300`}>
+        {/* Top bar */}
+        <header className="sticky top-0 z-20 h-16 bg-white/90 backdrop-blur border-b border-slate-200 px-6 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-semibold text-slate-900 truncate">
+              {pageTitle[activeTab]}
+            </h1>
+            <p className="text-xs text-slate-400 truncate hidden sm:block">
+              {pageSubtitle[activeTab]}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <div className="relative hidden md:block">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search groups, students, teachers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-72 pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-sm placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+              />
+            </div>
+
+            <button className="relative w-10 h-10 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center justify-center transition-colors">
+              <Bell className="w-[18px] h-[18px]" />
+              {stats.pendingGroups > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+              )}
+            </button>
+
             {(activeTab === "departments" || activeTab === "teachers") && (
               <button
                 onClick={() =>
@@ -2277,76 +1474,375 @@ const SettingsTab = () => {
                     ? setShowDepartmentModal(true)
                     : setShowTeacherModal(true)
                 }
-                className="bg-[#3F51B5] hover:bg-[#5C6BC0] text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+                className={btnPrimary}
               >
                 <Plus className="w-4 h-4" />
-                Add {activeTab === "departments" ? "Department" : "Teacher"}
+                <span className="hidden sm:inline">
+                  Add {activeTab === "departments" ? "Department" : "Teacher"}
+                </span>
               </button>
             )}
+
             {activeTab === "verified" && (
-              <button
-                onClick={openScheduleModal}
-                disabled={scheduling}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-              >
+              <button onClick={openScheduleModal} disabled={scheduling} className={btnPrimary}>
                 <Calendar className="w-4 h-4" />
-                {scheduling ? "Scheduling..." : "Create Schedule"}
+                <span className="hidden sm:inline">
+                  {scheduling ? "Scheduling..." : "Create Schedule"}
+                </span>
               </button>
             )}
+          </div>
+        </header>
 
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3F51B5] w-64"
+        <main className="p-6 space-y-5">
+          {/* Greeting */}
+          <div>
+            <h2 className="text-[22px] font-bold text-slate-900">
+              Hello, <span className="text-indigo-600">{adminName}</span>
+            </h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Welcome back to the FYP / MS Thesis jury assignment portal
+            </p>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {[
+              {
+                label: "Total Students",
+                value: stats.totalStudents,
+                icon: GraduationCap,
+                hint: "Registered in the portal",
+                tone: "bg-indigo-50 text-indigo-600",
+              },
+              {
+                label: "Total Teachers",
+                value: stats.totalTeachers,
+                icon: Users,
+                hint: "Available for jury duty",
+                tone: "bg-emerald-50 text-emerald-600",
+              },
+              {
+                label: "Departments",
+                value: stats.totalDepartments,
+                icon: Building2,
+                hint: "Active departments",
+                tone: "bg-violet-50 text-violet-600",
+              },
+              {
+                label: "Pending Groups",
+                value: stats.pendingGroups,
+                icon: AlertCircle,
+                hint: "Awaiting verification",
+                tone: "bg-amber-50 text-amber-600",
+              },
+            ].map((s) => (
+              <Card key={s.label} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[13px] text-slate-500">{s.label}</p>
+                    <p className="text-[26px] leading-tight font-bold text-slate-900 mt-1.5">
+                      {s.value}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">{s.hint}</p>
+                  </div>
+                  <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.tone}`}>
+                    <s.icon className="w-5 h-5" />
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {/* ============ PENDING ============ */}
+          {activeTab === "pending" && (
+            <Card>
+              <SectionHeader
+                title="Pending Groups"
+                subtitle={`${filteredPending.length} group(s) awaiting review`}
+                icon={ClipboardList}
               />
-            </div>
-          </div>
-        </div>
+              {filteredPending.length === 0 ? (
+                <EmptyState
+                  icon={CheckCircle}
+                  title="No pending groups"
+                  message="All submitted groups have been reviewed. New submissions will appear here."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {filteredPending.map((group) => (
+                    <li
+                      key={group.groupId}
+                      className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                          <ClipboardList className="w-[18px] h-[18px]" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                              {group.groupUsername}
+                            </p>
+                            <Badge tone="amber">Pending</Badge>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 truncate">
+                            Leader: {group.leaderEmail}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">
+                            Supervisor: {group.supervisorEmail || "Not assigned"}
+                          </p>
+                        </div>
+                      </div>
 
-        {/* Stats Cards */}
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <StatCard
-              title="Total Students"
-              value={stats.totalStudents}
-              icon={GraduationCap}
-              color="bg-blue-500"
-            />
-            <StatCard
-              title="Total Teachers"
-              value={stats.totalTeachers}
-              icon={Users}
-              color="bg-green-500"
-            />
-            <StatCard
-              title="Departments"
-              value={stats.totalDepartments}
-              icon={BookOpen}
-              color="bg-purple-500"
-            />
-            <StatCard
-              title="Pending Groups"
-              value={stats.pendingGroups}
-              icon={AlertCircle}
-              color="bg-orange-500"
-            />
-          </div>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <button onClick={() => handleViewGroup(group)} className={btnGhost}>
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                        <button onClick={() => handleApproveGroup(group)} className={btnGreen}>
+                          <CheckCircle className="w-4 h-4" />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectGroup(group.groupId)}
+                          className={btnRose}
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Reject
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
 
-          {/* Main Content - ALL TABS */}
-          {activeTab === "pending" && <PendingGroupsTab />}
-          {activeTab === "verified" && <VerifiedGroupsTab />}
-          {activeTab === "departments" && <DepartmentsTab />}
-          {activeTab === "teachers" && <TeachersTab />}
-          {activeTab === "students" && <StudentsTab />}
+          {/* ============ VERIFIED ============ */}
+          {activeTab === "verified" && (
+            <Card>
+              <SectionHeader
+                title="Verified Groups"
+                subtitle={`${filteredVerified.length} verified group(s)`}
+                icon={CheckCircle}
+              />
+              {filteredVerified.length === 0 ? (
+                <EmptyState
+                  icon={CheckCircle}
+                  title="No verified groups"
+                  message="Approved groups will show up here so you can assign juries and schedule evaluations."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {filteredVerified.map((group) => (
+                    <li
+                      key={group.groupId}
+                      className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          <CheckCircle className="w-[18px] h-[18px]" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                              {group.groupUsername}
+                            </p>
+                            <Badge tone="green">Verified</Badge>
+                            {group.juryId ? (
+                              <Badge tone="violet">
+                                <UserCheck className="w-3 h-3" /> Jury assigned
+                              </Badge>
+                            ) : (
+                              <Badge tone="amber">
+                                <AlertCircle className="w-3 h-3" /> Pending jury
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 truncate">
+                            Leader: {group.leaderEmail}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">
+                            Supervisor: {group.supervisorEmail || "Not assigned"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <button onClick={() => handleViewGroup(group)} className={btnGhost}>
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                        {!group.juryId && (
+                          <button
+                            onClick={() => handleAssignJury(group.groupId)}
+                            className={btnPrimary}
+                          >
+                            <UserCheck className="w-4 h-4" />
+                            Assign Jury
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+
+          {/* ============ STUDENTS ============ */}
+          {activeTab === "students" && (
+            <Card className="overflow-hidden">
+              <SectionHeader
+                title="Students"
+                subtitle={`${filteredStudents.length} student(s)`}
+                icon={GraduationCap}
+              />
+              {filteredStudents.length === 0 ? (
+                <EmptyState
+                  icon={GraduationCap}
+                  title="No students found"
+                  message="Students appear here once they register through the portal."
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50/80 border-b border-slate-100">
+                      <tr>
+                        <th className={th}>ID</th>
+                        <th className={th}>Name</th>
+                        <th className={th}>Roll No</th>
+                        <th className={th}>Email</th>
+                        <th className={th}>Section</th>
+                        <th className={th}>Batch</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredStudents.map((student) => (
+                        <tr key={student.stdId} className="hover:bg-slate-50/70 transition-colors">
+                          <td className={`${td} text-slate-400`}>{student.stdId}</td>
+                          <td className={`${td} font-medium text-slate-900`}>{student.name}</td>
+                          <td className={td}>
+                            <span className="font-mono text-xs text-slate-600">
+                              {student.rollNum || "—"}
+                            </span>
+                          </td>
+                          <td className={`${td} text-slate-500`}>{student.email}</td>
+                          <td className={td}>{student.section || "—"}</td>
+                          <td className={td}>{student.batch || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* ============ DEPARTMENTS ============ */}
+          {activeTab === "departments" && (
+            <Card className="overflow-hidden">
+              <SectionHeader
+                title="Departments"
+                subtitle={`${filteredDepartments.length} department(s)`}
+                icon={Building2}
+              />
+              {filteredDepartments.length === 0 ? (
+                <EmptyState
+                  icon={Building2}
+                  title="No departments yet"
+                  message='Click "Add Department" to create your first department.'
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50/80 border-b border-slate-100">
+                      <tr>
+                        <th className={th}>ID</th>
+                        <th className={th}>Department Name</th>
+                        <th className={`${th} text-right`}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredDepartments.map((dept) => (
+                        <tr key={dept.deptId} className="hover:bg-slate-50/70 transition-colors">
+                          <td className={`${td} text-slate-400`}>{dept.deptId}</td>
+                          <td className={`${td} font-medium text-slate-900`}>{dept.name}</td>
+                          <td className={`${td} text-right`}>
+                            <button
+                              onClick={() => deleteDepartment(dept.deptId)}
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                              title="Delete department"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* ============ TEACHERS ============ */}
+          {activeTab === "teachers" && (
+            <Card className="overflow-hidden">
+              <SectionHeader
+                title="Teachers"
+                subtitle={`${filteredTeachers.length} faculty member(s)`}
+                icon={Users}
+              />
+              {filteredTeachers.length === 0 ? (
+                <EmptyState
+                  icon={Users}
+                  title="No teachers yet"
+                  message='Click "Add Teacher" to register faculty for jury assignment.'
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50/80 border-b border-slate-100">
+                      <tr>
+                        <th className={th}>ID</th>
+                        <th className={th}>Name</th>
+                        <th className={th}>Email</th>
+                        <th className={th}>Department</th>
+                        <th className={th}>Specialization</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredTeachers.map((teacher) => (
+                        <tr
+                          key={teacher.TeacherId}
+                          className="hover:bg-slate-50/70 transition-colors"
+                        >
+                          <td className={`${td} text-slate-400`}>{teacher.TeacherId}</td>
+                          <td className={`${td} font-medium text-slate-900`}>{teacher.name}</td>
+                          <td className={`${td} text-slate-500`}>{teacher.email}</td>
+                          <td className={td}>
+                            <Badge tone="indigo">{deptName(teacher.deptId)}</Badge>
+                          </td>
+                          <td className={td}>{teacher.specialization || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* ============ PROFILE / SETTINGS ============ */}
+          {activeTab === "profile" && <ProfileTab user={user} />}
           {activeTab === "settings" && <SettingsTab />}
-        </div>
+        </main>
       </div>
 
-      {/* Modals */}
+      {/* ================= MODALS ================= */}
+
       {showDepartmentModal && (
         <DepartmentModalComponent
           isOpen={showDepartmentModal}
@@ -2354,6 +1850,7 @@ const SettingsTab = () => {
           onSave={handleAddDepartment}
         />
       )}
+
       {showTeacherModal && (
         <TeacherModalComponent
           isOpen={showTeacherModal}
@@ -2362,11 +1859,394 @@ const SettingsTab = () => {
           departments={departments}
         />
       )}
-      {showCredentials.show && <CredentialsModal />}
-      {/* View Group Modal */}
-      {showGroupModal.show && <ViewGroupModal />}
-      {rejectModal.show && <RejectionModal />}
-      {showScheduleModal && <ScheduleDateModal />}
+
+      {/* Credentials */}
+      {showCredentials.show && (
+        <ModalShell
+          title="Group Credentials"
+          subtitle="Share these details with the group leader"
+          icon={Mail}
+          tone="green"
+          onClose={() => setShowCredentials({ show: false, group: null, password: "" })}
+          footer={
+            <button
+              onClick={() => setShowCredentials({ show: false, group: null, password: "" })}
+              className={btnPrimary}
+            >
+              Done
+            </button>
+          }
+        >
+          <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 mb-4">
+            <Mail className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>Credentials have been emailed to {showCredentials.group?.leaderEmail}</span>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className={labelBase}>Group Username</label>
+              <input
+                readOnly
+                value={showCredentials.group?.groupUsername || ""}
+                className={`${inputBase} bg-slate-50 font-mono`}
+              />
+            </div>
+            <div>
+              <label className={labelBase}>Password</label>
+              <input
+                readOnly
+                value={showCredentials.password}
+                className={`${inputBase} bg-slate-50 font-mono tracking-wider`}
+              />
+              <p className="text-xs text-slate-400 mt-1.5">
+                This password is shown only once — keep a copy if needed.
+              </p>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+
+      {/* View group */}
+      {showGroupModal.show && showGroupModal.group && (
+        <ModalShell
+          title="Group Details"
+          subtitle="Complete information about the group and its members"
+          icon={Users}
+          size="xl"
+          onClose={() => setShowGroupModal({ show: false, group: null })}
+          footer={
+            <>
+              <button
+                onClick={() => setShowGroupModal({ show: false, group: null })}
+                className={btnGhost}
+              >
+                Close
+              </button>
+              {showGroupModal.group.status === "PENDING" && (
+                <>
+                  <button
+                    onClick={() => handleApproveGroup(showGroupModal.group as StudentGroup)}
+                    className={btnGreen}
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleRejectGroup(showGroupModal.group!.groupId)}
+                    className={btnRose}
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Reject
+                  </button>
+                </>
+              )}
+            </>
+          }
+        >
+          <div className="space-y-6">
+            {/* Overview */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                Group Information
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-2xl bg-slate-50 border border-slate-100 p-5">
+                <div>
+                  <p className="text-xs text-slate-500">Group Username</p>
+                  <p className="text-sm font-semibold text-slate-900 mt-1 break-all">
+                    {showGroupModal.group.groupUsername}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Leader Email</p>
+                  <p className="text-sm text-slate-800 mt-1 break-all">
+                    {showGroupModal.group.leaderEmail}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Supervisor</p>
+                  <p className="text-sm text-slate-800 mt-1 break-all">
+                    {showGroupModal.group.supervisorEmail || "Not assigned"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                Status
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {showGroupModal.group.status === "VERIFIED" && <Badge tone="green">Verified</Badge>}
+                {showGroupModal.group.status === "PENDING" && (
+                  <Badge tone="amber">Pending approval</Badge>
+                )}
+                {showGroupModal.group.status === "DENIED" && <Badge tone="rose">Denied</Badge>}
+                {showGroupModal.group.juryId ? (
+                  <Badge tone="violet">
+                    <UserCheck className="w-3 h-3" /> Jury assigned
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Project */}
+            {showGroupModal.group.projectDetails && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                  Project Details
+                </p>
+                <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 space-y-4">
+                  <div>
+                    <p className="text-xs text-slate-500">Project Title</p>
+                    <p className="text-sm font-semibold text-slate-900 mt-1">
+                      {showGroupModal.group.projectDetails.PROJECTTITLE || "Not submitted"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">Domains</p>
+                    <div className="flex flex-wrap gap-2">
+                      {showGroupModal.group.projectDetails.domains ? (
+                        showGroupModal.group.projectDetails.domains
+                          .split(",")
+                          .map((domain: string, idx: number) => (
+                            <Badge key={idx} tone="indigo">
+                              {domain.trim()}
+                            </Badge>
+                          ))
+                      ) : (
+                        <p className="text-sm text-slate-500">No domains selected</p>
+                      )}
+                    </div>
+                  </div>
+                  {showGroupModal.group.projectDetails.PROPOSALDOCUMENT && (
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Proposal Document</p>
+                      <a
+                        href={showGroupModal.group.projectDetails.PROPOSALDOCUMENT}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                      >
+                        <FileText className="w-4 h-4" />
+                        View proposal
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Members */}
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+                Group Members
+              </p>
+              <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className={th}>#</th>
+                      <th className={th}>Full Name</th>
+                      <th className={th}>Email</th>
+                      <th className={th}>Section</th>
+                      <th className={th}>Batch</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {showGroupModal.group.members && showGroupModal.group.members.length > 0 ? (
+                      showGroupModal.group.members.map((member: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50/70">
+                          <td className={`${td} text-slate-400`}>{idx + 1}</td>
+                          <td className={`${td} font-medium text-slate-900`}>{member.name}</td>
+                          <td className={`${td} text-slate-500 break-all`}>{member.email}</td>
+                          <td className={td}>{member.section || "—"}</td>
+                          <td className={td}>{member.batch || "—"}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5}>
+                          <EmptyState
+                            icon={Users}
+                            title="No members found"
+                            message="This group has no members assigned yet."
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+
+      {/* Reject */}
+      {rejectModal.show && (
+        <ModalShell
+          title="Reject Group"
+          subtitle="The group leader will be notified by email"
+          icon={XCircle}
+          tone="rose"
+          onClose={handleCancelRejection}
+          footer={
+            <>
+              <button onClick={handleCancelRejection} className={btnGhost}>
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRejection}
+                disabled={!rejectModal.reason.trim()}
+                className={btnRose}
+              >
+                <XCircle className="w-4 h-4" />
+                Confirm Rejection
+              </button>
+            </>
+          }
+        >
+          <div className="px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 mb-4">
+            This action cannot be undone. The group leader will receive your reason by email.
+          </div>
+
+          <label className={labelBase}>Reason for Rejection *</label>
+          <input
+            value={rejectModal.reason}
+            onChange={(e) => setRejectModal((prev) => ({ ...prev, reason: e.target.value }))}
+            className={inputBase}
+            placeholder="Please provide a clear reason for rejection..."
+            autoFocus
+            dir="ltr"
+          />
+
+          <p className="text-xs text-slate-400 mt-4 mb-2">Quick suggestions</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Insufficient group members",
+              "Invalid email format",
+              "Project domain mismatch",
+              "Incomplete application",
+              "Supervisor not available",
+              "Duplicate registration",
+            ].map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => setRejectModal((prev) => ({ ...prev, reason: suggestion }))}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </ModalShell>
+      )}
+
+      {/* Schedule */}
+      {showScheduleModal && (
+        <ModalShell
+          title="Schedule Evaluations"
+          subtitle="Auto-assign verified groups to slots and venues"
+          icon={Calendar}
+          tone="green"
+          onClose={closeScheduleModal}
+          footer={
+            <>
+              <button onClick={closeScheduleModal} className={btnGhost}>
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAutoSchedule(scheduleDates.startDate, scheduleDates.endDate)}
+                disabled={!scheduleDates.startDate || !scheduleDates.endDate || scheduling}
+                className={btnGreen}
+              >
+                {scheduling ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Scheduling...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="w-4 h-4" />
+                    Create Schedule
+                  </>
+                )}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div className="px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-700">
+              Select the date range for evaluations. All verified groups will be assigned to
+              available time slots and venues automatically.
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelBase}>
+                  Start Date <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDates.startDate}
+                  onChange={(e) =>
+                    setScheduleDates((prev) => ({ ...prev, startDate: e.target.value }))
+                  }
+                  className={inputBase}
+                  min={new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelBase}>
+                  End Date <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDates.endDate}
+                  onChange={(e) =>
+                    setScheduleDates((prev) => ({ ...prev, endDate: e.target.value }))
+                  }
+                  className={inputBase}
+                  min={scheduleDates.startDate || new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+            </div>
+
+            {scheduleDates.startDate && scheduleDates.endDate && (
+              <div className="rounded-xl bg-slate-50 border border-slate-100 p-4 text-xs text-slate-600 space-y-1">
+                <p>
+                  <span className="font-medium text-slate-700">From:</span>{" "}
+                  {new Date(scheduleDates.startDate).toLocaleDateString()}
+                </p>
+                <p>
+                  <span className="font-medium text-slate-700">To:</span>{" "}
+                  {new Date(scheduleDates.endDate).toLocaleDateString()}
+                </p>
+                <p>
+                  <span className="font-medium text-slate-700">Duration:</span>{" "}
+                  {Math.ceil(
+                    (new Date(scheduleDates.endDate).getTime() -
+                      new Date(scheduleDates.startDate).getTime()) /
+                      (1000 * 60 * 60 * 24),
+                  ) + 1}{" "}
+                  days
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs text-amber-700 space-y-1">
+              <p className="font-medium">Note</p>
+              <p>• Only verified groups without an existing schedule are scheduled</p>
+              <p>• Time slots run 8:00 AM – 4:00 PM (50 minutes each)</p>
+              <p>• Conflicts are handled automatically</p>
+            </div>
+          </div>
+        </ModalShell>
+      )}
     </div>
   );
 }
