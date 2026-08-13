@@ -15,6 +15,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [activeRole, setActiveRole] = useState<'student' | 'admin' | 'teacher'>('student');
+    const [emailError, setEmailError] = useState('');
 
     useEffect(() => {
         fetchDepartments()
@@ -28,63 +29,106 @@ export default function LoginPage() {
         }
     }
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
-  
-  // Use UPPERCASE consistently
-  const role = activeRole === 'student' ? 'STUDENT' : 
-                activeRole === 'admin' ? 'ADMIN' : 'TEACHER';
-  
-  const formData = new FormData();
-  formData.append('email', identifier);
-  formData.append('pass', password);
-  formData.append('role', role);  // Now sends 'ADMIN', 'TEACHER', or 'STUDENT'
+    // Email validation function for @nu.edu.pk domain
+    const validateEmail = (email: string): boolean => {
+        // Trim and convert to lowercase for case-insensitive comparison
+        const trimmedEmail = email.trim().toLowerCase();
+        
+        // Check if email ends with @nu.edu.pk
+        if (!trimmedEmail.endsWith('@nu.edu.pk')) {
+            return false;
+        }
 
-  try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      body: formData
-    });
+        // Check if there's a username before the @ symbol
+        const usernamePart = trimmedEmail.split('@')[0];
+        if (!usernamePart || usernamePart.length === 0) {
+            return false;
+        }
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      setError(data.message || "Login failed");
-      return;
-    }
-    
-    console.log("User logged in:", data.user);
-    
-    // Create NextAuth session with consistent role
-    await signIn('credentials', {
-      identifier: data.user.email || data.user.name,
-      password: password,
-      role: role,  // Same uppercase role
-      redirect: false,
-    });
-    
-    localStorage.setItem('user', JSON.stringify(data.user));
-    
-    // Redirect based on role
-    if (data.user.role === 'ADMIN') {
-      router.push('/admin/dashboard');
-    } else if (data.user.role === 'TEACHER') {
-      router.push('/teacher/dashboard');
-    } else if (data.user.role === 'STUDENT') {
-      router.push('/student/dashboard');
-    }
-    
-  } catch (error) {
-    console.error("Login error:", error);
-    setError("Something went wrong");
-  } finally {
-    setLoading(false);
-  }
-};
+        return true;
+    };
 
+    // Real-time email validation on input change
+    const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setIdentifier(value);
+        
+        // Only validate for admin and teacher roles (not student)
+        if (activeRole !== 'student') {
+            if (value && !validateEmail(value)) {
+                setEmailError('Email must be @nu.edu.pk domain');
+            } else {
+                setEmailError('');
+            }
+        } else {
+            setEmailError('');
+        }
+    };
 
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError("");
+
+        // Validate email before submitting (for admin and teacher)
+        if (activeRole !== 'student') {
+            if (!validateEmail(identifier)) {
+                setError('Please use a valid @nu.edu.pk email address');
+                setLoading(false);
+                return;
+            }
+        }
+
+        // Use UPPERCASE consistently
+        const role = activeRole === 'student' ? 'STUDENT' : 
+                    activeRole === 'admin' ? 'ADMIN' : 'TEACHER';
+
+        const formData = new FormData();
+        formData.append('email', identifier);
+        formData.append('pass', password);
+        formData.append('role', role);
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+                setError(data.message || "Login failed");
+                return;
+            }
+            
+            console.log("User logged in:", data.user);
+            
+            // Create NextAuth session with consistent role
+            await signIn('credentials', {
+                identifier: data.user.email || data.user.name,
+                password: password,
+                role: role,
+                redirect: false,
+            });
+            
+            localStorage.setItem('user', JSON.stringify(data.user));
+            
+            // Redirect based on role
+            if (data.user.role === 'ADMIN') {
+                router.push('/admin/dashboard');
+            } else if (data.user.role === 'TEACHER') {
+                router.push('/teacher/dashboard');
+            } else if (data.user.role === 'STUDENT') {
+                router.push('/student/dashboard');
+            }
+            
+        } catch (error) {
+            console.error("Login error:", error);
+            setError("Something went wrong");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -102,7 +146,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <div className="bg-gray-100 rounded-lg p-1 mb-6">
                     <div className="flex gap-1">
                         <button
-                            onClick={() => setActiveRole('student')}
+                            onClick={() => {
+                                setActiveRole('student');
+                                setEmailError('');
+                                setError('');
+                            }}
                             className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
                                 activeRole === 'student'
                                     ? 'bg-white text-[#3F51B5] shadow-sm'
@@ -112,7 +160,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                             Student Group
                         </button>
                         <button
-                            onClick={() => setActiveRole('teacher')}
+                            onClick={() => {
+                                setActiveRole('teacher');
+                                setEmailError('');
+                                setError('');
+                            }}
                             className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
                                 activeRole === 'teacher'
                                     ? 'bg-white text-[#3F51B5] shadow-sm'
@@ -122,7 +174,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                             Teacher
                         </button>
                         <button
-                            onClick={() => setActiveRole('admin')}
+                            onClick={() => {
+                                setActiveRole('admin');
+                                setEmailError('');
+                                setError('');
+                            }}
                             className={`flex-1 py-2 rounded-md text-sm font-medium transition-all ${
                                 activeRole === 'admin'
                                     ? 'bg-white text-[#3F51B5] shadow-sm'
@@ -146,25 +202,35 @@ const handleSubmit = async (e: React.FormEvent) => {
                         {/* Identifier Field */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                {activeRole === 'student' ? 'Group Username' : activeRole === 'teacher' ? 'Email Address' : 'Username'}
+                                {activeRole === 'student' ? 'Group Username' : 'Email Address'}
                             </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Mail className="h-4 w-4 text-gray-400" />
                                 </div>
                                 <input
-                                    type={activeRole === 'teacher' ? 'email' : 'text'}
+                                    type={activeRole === 'student' ? 'text' : 'email'}
                                     required
                                     value={identifier}
-                                    onChange={(e) => setIdentifier(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3F51B5] focus:border-transparent transition-all"
+                                    onChange={handleEmailChange}
+                                    className={`w-full pl-9 pr-3 py-2 border rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3F51B5] focus:border-transparent transition-all ${
+                                        emailError && activeRole !== 'student' 
+                                            ? 'border-red-500' 
+                                            : 'border-gray-200'
+                                    }`}
                                     placeholder={
                                         activeRole === 'student' 
                                             ? "Enter group username" 
-                                            : activeRole === 'admin' ? "Enter username" : "teacher@nu.edu.pk"
+                                            : activeRole === 'admin' 
+                                                ? "admin@nu.edu.pk" 
+                                                : "teacher@nu.edu.pk"
                                     }
                                 />
                             </div>
+                            {emailError && activeRole !== 'student' && (
+                                <p className="mt-1 text-xs text-red-500">{emailError}</p>
+                            )}
+                           
                         </div>
 
                         {/* Password Field */}
@@ -211,7 +277,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || (activeRole !== 'student' && !!emailError)}
                             className="w-full bg-[#3F51B5] hover:bg-[#5C6BC0] text-white font-medium py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? (
@@ -229,7 +295,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                     </form>
 
                     {/* Register Link */}
-                   {activeRole === 'student' &&  <p className="mt-6 text-center text-sm text-gray-500">
+                    {activeRole === 'student' &&  <p className="mt-6 text-center text-sm text-gray-500">
                         Don't have an account?{' '}
                         <Link href="/register" className="text-[#3F51B5] hover:text-[#5C6BC0] font-medium">
                             Register as Student Group

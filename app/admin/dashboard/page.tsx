@@ -28,6 +28,9 @@ import {
   Target,
   FileText,
   Calendar,
+  Lock,
+  Shield,
+  Settings,
 } from "lucide-react";
 
 interface ModalGroupData extends StudentGroup {
@@ -85,7 +88,7 @@ interface Teacher {
   specialization: string;
 }
 
-type TabType = "pending" | "verified" | "departments" | "teachers" | "students";
+type TabType = "pending" | "verified" | "departments" | "teachers" | "students" | "settings";
 interface StudentGroup {
   groupId: number;
   groupUsername: string;
@@ -816,6 +819,15 @@ export default function AdminDashboard() {
           {!sidebarCollapsed && <span>Students</span>}
         </button>
       </nav>
+      <button
+  onClick={() => setActiveTab('settings')}
+  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+    activeTab === 'settings' ? 'bg-[#3F51B5] text-white shadow-lg' : 'text-[#9FA8DA] hover:bg-white/10 hover:text-white'
+  }`}
+>
+  <Settings className="w-5 h-5" />
+  {!sidebarCollapsed && <span className="text-sm font-medium">Settings</span>}
+</button>
 
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#3F51B5]/30">
         <button
@@ -1733,6 +1745,434 @@ const handleAddDepartment = async (deptName: string) => {
     </div>
   );
 
+ // app/(dashboard)/admin/page.tsx - Add this component
+
+const SettingsTab = () => {
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Password form state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+
+  // Profile settings form
+  const [adminSettings, setAdminSettings] = useState({
+    username: "",
+    email: "",
+    notifications: true,
+    theme: "light",
+  });
+
+  // Fetch admin profile on mount
+  useEffect(() => {
+    fetchAdminProfile();
+  }, []);
+
+  const fetchAdminProfile = async () => {
+    setLoading(true);
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      // You can fetch admin details from API if needed
+      setAdminSettings({
+        username: storedUser.name || "Admin",
+        email: storedUser.email || "admin@fyp.com",
+        notifications: true,
+        theme: "light",
+      });
+    } catch (error) {
+      console.error("Error fetching admin profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: storedUser.name,
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess("Password changed successfully!");
+        setPasswordForm({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.message || "Failed to change password");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSettingsUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    setSaving(true);
+
+    try {
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const response = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: storedUser.name,
+          notifications: adminSettings.notifications,
+          theme: adminSettings.theme,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess("Settings updated successfully!");
+        // Update localStorage
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        user.notifications = adminSettings.notifications;
+        user.theme = adminSettings.theme;
+        localStorage.setItem("user", JSON.stringify(user));
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.message || "Failed to update settings");
+      }
+    } catch (error) {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#3F51B5] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <CheckCircle className="w-5 h-5" />
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-5 h-5" />
+          {error}
+        </div>
+      )}
+
+      {/* Change Password Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-[#3F51B5]" />
+            <h3 className="text-lg font-semibold text-gray-800">Change Password</h3>
+          </div>
+          <p className="text-sm text-gray-500 mt-0.5">Update your login credentials</p>
+        </div>
+
+        <form onSubmit={handlePasswordChange} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Current Password
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Lock className="w-4 h-4 text-gray-400" />
+              </div>
+              <input
+                type={showCurrentPassword ? "text" : "password"}
+                value={passwordForm.currentPassword}
+                onChange={(e) =>
+                  setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
+                }
+                className="w-full pl-9 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+                placeholder="Enter current password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                {showCurrentPassword ? (
+                  <EyeOff className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <Eye className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                New Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="w-4 h-4 text-gray-400" />
+                </div>
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={passwordForm.newPassword}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, newPassword: e.target.value })
+                  }
+                  className="w-full pl-9 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+                  placeholder="Enter new password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="w-4 h-4 text-gray-400" />
+                </div>
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
+                  }
+                  className="w-full pl-9 pr-10 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+                  placeholder="Confirm new password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2 bg-[#3F51B5] text-white rounded-lg hover:bg-[#5C6BC0] transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? "Changing Password..." : "Change Password"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Profile Settings Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-[#3F51B5]" />
+            <h3 className="text-lg font-semibold text-gray-800">Account Settings</h3>
+          </div>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your account preferences</p>
+        </div>
+
+        <form onSubmit={handleSettingsUpdate} className="p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Username
+              </label>
+              <input
+                type="text"
+                value={adminSettings.username}
+                disabled
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-400 mt-1">Username cannot be changed</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                value={adminSettings.email}
+                disabled
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>
+            </div>
+          </div>
+
+          {/* Theme Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Theme Preference
+            </label>
+            <select
+              value={adminSettings.theme}
+              onChange={(e) =>
+                setAdminSettings({ ...adminSettings, theme: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3F51B5]"
+            >
+              <option value="light">☀️ Light</option>
+              <option value="dark">🌙 Dark</option>
+              <option value="system">💻 System Default</option>
+            </select>
+          </div>
+
+          {/* Notifications Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium text-gray-800">Email Notifications</p>
+              <p className="text-sm text-gray-500">Receive notifications about system updates</p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setAdminSettings({
+                  ...adminSettings,
+                  notifications: !adminSettings.notifications,
+                })
+              }
+              className={`relative w-12 h-6 rounded-full transition-colors ${
+                adminSettings.notifications ? "bg-[#3F51B5]" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                  adminSettings.notifications ? "translate-x-6" : ""
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2 bg-[#3F51B5] text-white rounded-lg hover:bg-[#5C6BC0] transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? "Saving..." : "Save Settings"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Account Actions */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-red-500" />
+            <h3 className="text-lg font-semibold text-gray-800">Account Actions</h3>
+          </div>
+          <p className="text-sm text-gray-500 mt-0.5">Advanced account management</p>
+        </div>
+
+        <div className="p-6 space-y-3">
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to log out from all devices?")) {
+                // Handle logout from all devices
+              }
+            }}
+            className="w-full text-left px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors flex items-center gap-3"
+          >
+            <LogOut className="w-5 h-5 text-yellow-600" />
+            <div>
+              <p className="font-medium text-gray-800">Logout from All Devices</p>
+              <p className="text-sm text-gray-500">End all active sessions</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              if (confirm("Are you sure you want to deactivate your account? This action cannot be undone.")) {
+                // Handle account deactivation
+              }
+            }}
+            className="w-full text-left px-4 py-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-3"
+          >
+            <XCircle className="w-5 h-5 text-red-600" />
+            <div>
+              <p className="font-medium text-red-800">Deactivate Account</p>
+              <p className="text-sm text-red-500">Permanently deactivate your admin account</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
   // ============================================
   // Credentials Modal
   // ============================================
@@ -1826,6 +2266,7 @@ const handleAddDepartment = async (deptName: string) => {
               {activeTab === "departments" && "Departments"}
               {activeTab === "teachers" && "Teachers"}
               {activeTab === "students" && "Students"}
+              {activeTab === "settings" && "Settings"}
             </h2>
 
             {/* Add buttons for departments and teachers */}
@@ -1901,6 +2342,7 @@ const handleAddDepartment = async (deptName: string) => {
           {activeTab === "departments" && <DepartmentsTab />}
           {activeTab === "teachers" && <TeachersTab />}
           {activeTab === "students" && <StudentsTab />}
+          {activeTab === "settings" && <SettingsTab />}
         </div>
       </div>
 
