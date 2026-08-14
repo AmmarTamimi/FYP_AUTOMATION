@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { executeQuery } from "@/app/lib/db.server";
 import { sendTeacherCredentials } from "@/app/lib/email";
+import { log } from "console";
 
 // Helper function to determine teacher level
 function determineTeacherLevel(
@@ -22,6 +23,8 @@ function determineTeacherLevel(
 export async function GET(req: NextRequest) {
   try {
     const teachers = await executeQuery("SELECT * FROM teachers");
+    console.log(teachers);
+    
     return NextResponse.json(teachers);
   } catch (error) {
     return NextResponse.json(
@@ -41,13 +44,13 @@ export async function POST(req: NextRequest) {
       specialization,
       qualification,
       experience,
-      role,
+      designation
     } = body;
 
     // ✅ Validate required fields
-    if (!name || !email || !department) {
+    if (!name || !email || !department || !designation) {
       return NextResponse.json(
-        { message: "Name, email, and department are required" },
+        { message: "Name, email, designation and department are required" },
         { status: 400 },
       );
     }
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest) {
     const autoRole = determineTeacherLevel(qualification, experienceNum);
 
     console.log(
-      `Teacher ${name}: Qualification: ${qualification}, Experience: ${experienceNum} years → Role: ${autoRole}`,
+      `Teacher ${name}: Qualification: ${qualification}, Designation: ${designation} Experience: ${experienceNum} years → Role: ${autoRole}`,
     );
 
     // ✅ Check for duplicate teacher (by email or name)
@@ -83,6 +86,8 @@ export async function POST(req: NextRequest) {
       [department],
     );
 
+    console.log(dept);
+    
     const deptId = (dept as any[])[0]?.DEPTID;
 
     if (!deptId) {
@@ -98,8 +103,8 @@ export async function POST(req: NextRequest) {
     // ✅ Add teacher with auto-determined role
     const result = await executeQuery(
       `INSERT INTO teachers 
-             (EMAIL, USERNAME, NAME, PASSWORD, SPECIALIZATION, QUALIFICATION, EXPERIENCE, ROLE, DEPTID) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (EMAIL, USERNAME, NAME, PASSWORD, SPECIALIZATION, QUALIFICATION, EXPERIENCE, ROLE, DESIGNATION, DEPTID) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         email,
         email,
@@ -109,6 +114,7 @@ export async function POST(req: NextRequest) {
         qualification,
         experienceNum,
         autoRole,
+        designation,
         deptId,
       ],
     );
