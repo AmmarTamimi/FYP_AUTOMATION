@@ -33,6 +33,7 @@ import {
   ClipboardList,
   Building2,
 } from "lucide-react";
+import AssignJuryModal from "@/app/components/AssignJuryModel";
 
 /* ============================================================
    TYPES
@@ -907,7 +908,7 @@ const SettingsTab = () => {
 export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("pending");
+  const [activeTab, setActiveTab] = useState<TabType>("settings");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scheduling, setScheduling] = useState(false);
@@ -948,6 +949,9 @@ export default function AdminDashboard() {
     totalDepartments: 0,
     pendingGroups: 0,
   });
+
+  const [showAssignJuryModal, setShowAssignJuryModal] = useState(false);
+const [selectedGroupForJury, setSelectedGroupForJury] = useState<{ groupId: number; groupUsername: string } | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -1114,29 +1118,43 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAssignJury = async (groupId: number) => {
-    try {
-      const response = await fetch("/api/admin/assign-jury", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId }),
-      });
+// Handle assign jury button click
+const handleOpenAssignJury = (group: StudentGroup) => {
+  setSelectedGroupForJury({
+    groupId: group.groupId,
+    groupUsername: group.groupUsername
+  });
+  setShowAssignJuryModal(true);
+};
 
-      const data = await response.json();
+// Handle jury assignment
+const handleAssignJury = async (groupId: number, seniorId: number, juniorId: number) => {
+  try {
+    const response = await fetch('/api/admin/assign-jury', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        groupId, 
+        seniorId, 
+        juniorId,
+        manualAssignment: true 
+      }),
+    });
 
-      if (response.ok) {
-        alert(
-          `Jury assigned!\nSenior: ${data.data.seniorTeacher}\nJunior: ${data.data.juniorTeacher}`,
-        );
-        fetchDashboardData();
-      } else {
-        alert(data.message || "Failed to assign jury");
-      }
-    } catch (error) {
-      console.error("Error assigning jury:", error);
-      alert("Network error");
+    const data = await response.json();
+
+    if (response.ok) {
+      alert(`✅ Jury assigned successfully!\nSenior: ${data.data.seniorTeacher}\nJunior: ${data.data.juniorTeacher}`);
+      fetchDashboardData(); // Refresh the list
+      setShowAssignJuryModal(false);
+    } else {
+      alert(data.message || "Failed to assign jury");
     }
-  };
+  } catch (error) {
+    console.error("Error assigning jury:", error);
+    alert("Network error");
+  }
+};
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -1676,19 +1694,32 @@ export default function AdminDashboard() {
                         </button>
                         {!group.juryId && (
                           <button
-                            onClick={() => handleAssignJury(group.groupId)}
+                            onClick={() => handleOpenAssignJury(group)}
                             className={btnPrimary}
                           >
                             <UserCheck className="w-4 h-4" />
                             Assign Jury
                           </button>
                         )}
+                        {showAssignJuryModal && selectedGroupForJury && (
+  <AssignJuryModal
+    isOpen={showAssignJuryModal}
+    onClose={() => {
+      setShowAssignJuryModal(false);
+      setSelectedGroupForJury(null);
+    }}
+    groupId={selectedGroupForJury.groupId}
+    groupUsername={selectedGroupForJury.groupUsername}
+    onAssign={handleAssignJury}
+  />
+)}
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
             </Card>
+            
           )}
 
           {/* ============ STUDENTS ============ */}
