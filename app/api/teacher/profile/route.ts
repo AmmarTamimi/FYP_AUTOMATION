@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
     
     const teacherDetails = await executeQuery(
-      'SELECT teacherId, name, email, specialization, qualification, experience, role FROM teachers WHERE email = ?',
+      'SELECT t.teacherId, t.name, t.email, t.specialization, t.qualification, t.experience, t.role, t.designation, t.deptId, d.name as department FROM teachers t LEFT JOIN departments d ON t.deptId = d.deptId WHERE email = ?',
       [email],
     );
     

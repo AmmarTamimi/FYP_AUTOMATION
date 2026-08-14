@@ -50,6 +50,7 @@ interface Teacher {
   qualification: string;
   experience: number;
   role: "senior" | "junior";
+  designation: string;
   deptId: number;
 }
 
@@ -625,6 +626,19 @@ Object.keys(scheduleByDate).forEach((dateKey) => {
                   <p className="font-medium text-gray-800">{teacher.email}</p>
                 </div>
               </div>
+
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <Briefcase className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Designation</p>
+                  <p className="font-medium text-gray-800">
+                    {teacher.designation || 'Not Assigned'}
+                  </p>
+                </div>
+              </div>
+              
 
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                 <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">

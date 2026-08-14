@@ -36,6 +36,7 @@ interface TeacherProfile {
   qualification: string;
   experience: number;
   role: "senior" | "junior";
+  designation: string;
   department: string;
 }
 
@@ -295,7 +296,18 @@ export default function TeacherProfilePage() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">{profile.name}</h2>
-                <p className="text-indigo-200 text-sm">{profile.email}</p>
+                <p className="text-indigo-200 text-sm">{profile.email}</p>'
+                
+                <div className="flex items-center gap-2 mt-1">
+                  <Briefcase className="w-3.5 h-3.5 text-indigo-300" />
+                  <p className="text-indigo-100 text-sm font-medium">
+                    {profile.designation || 'Not Assigned'}
+                    
+                    
+                  </p>
+                </div>
+                
+                
                 <div className="flex items-center gap-2 mt-1">
                   <span
                     className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -347,6 +359,51 @@ export default function TeacherProfilePage() {
                     Email cannot be changed. Contact admin for changes.
                   </p>
                 </div>
+                
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Designation
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Briefcase className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={profile.designation || 'Not Assigned'}
+                      disabled
+                      className="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Designation is set by the administrator.
+                  </p>
+                </div>
+
+                {/* Moved dept here */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Department
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <School className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={profile.department || 'Not Assigned'}
+                      disabled
+                      className="w-full pl-9 pr-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Contact admin to change department.
+                  </p>
+                </div>
+
+
+
               </div>
 
               {/* Editable Fields */}
@@ -485,25 +542,7 @@ export default function TeacherProfilePage() {
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Department
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <School className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      value={profile.department || "Not Assigned"}
-                      disabled
-                      className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Contact admin to change department.
-                  </p>
-                </div>
+                
               </div>
 
               {/* Role Change Warning */}

@@ -90,6 +90,7 @@ interface Teacher {
   name: string;
   email: string;
   deptId: number;
+  designation: string;
   specialization: string;
 }
 
@@ -345,6 +346,7 @@ const TeacherModalComponent = ({
     specialization: "",
     qualification: "",
     experience: "",
+    designation: "",
     role: "junior",
   });
 
@@ -357,6 +359,7 @@ const TeacherModalComponent = ({
         specialization: "",
         qualification: "",
         experience: "",
+        designation: "",
         role: "junior",
       });
     }
@@ -450,15 +453,21 @@ const TeacherModalComponent = ({
             placeholder="5"
           />
         </div>
-        <div className="md:col-span-2">
-          <label className={labelBase}>Jury Role *</label>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Designation *
+          </label>
           <select
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+            value={formData.designation}
+            onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
             className={inputBase}
+            required
           >
-            <option value="junior">Junior</option>
-            <option value="senior">Senior</option>
+            <option value="">Select designation</option>
+            <option value="Lab Instructor">Lab Instructor</option>
+            <option value="Lecturer">Lecturer</option>
+            <option value="Assistant Professor">Assistant Professor</option>
+            <option value="Professor">Professor</option>
           </select>
         </div>
       </div>
@@ -1128,7 +1137,7 @@ const handleOpenAssignJury = (group: StudentGroup) => {
 };
 
 // Handle jury assignment
-const handleAssignJury = async (groupId: number, seniorId: number, juniorId: number) => {
+const handleAssignJury = async (groupId: number, seniorId: number, juniorId: number, seniorTeacherName: string, seniorTeacherEmail: string,juniorTeacherName: string, juniorTeacherEmail: string) => {
   try {
     const response = await fetch('/api/admin/assign-jury', {
       method: 'POST',
@@ -1137,7 +1146,11 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
         groupId, 
         seniorId, 
         juniorId,
-        manualAssignment: true 
+        seniorTeacherName,
+        seniorTeacherEmail,
+        juniorTeacherName,
+        juniorTeacherEmail,
+        manualAssignment: true
       }),
     });
 
@@ -1291,7 +1304,7 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
     [students, q],
   );
   const filteredTeachers = useMemo(
-    () => (teachers || []).filter((t) => match(t.name, t.email, t.specialization)),
+    () => (teachers || []).filter((t) => match(t.name, t.email, t.specialization, t.designation)),
     [teachers, q],
   );
   const filteredDepartments = useMemo(
@@ -1840,6 +1853,7 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
                         <th className={th}>ID</th>
                         <th className={th}>Name</th>
                         <th className={th}>Email</th>
+                        <th className={th}>Designation</th>
                         <th className={th}>Department</th>
                         <th className={th}>Specialization</th>
                       </tr>
@@ -1853,6 +1867,18 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
                           <td className={`${td} text-slate-400`}>{teacher.TeacherId}</td>
                           <td className={`${td} font-medium text-slate-900`}>{teacher.name}</td>
                           <td className={`${td} text-slate-500`}>{teacher.email}</td>
+                          <td className={td}>
+                            {/* ✅ ADD THIS - Designation with color coding */}
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                              teacher.designation === 'Professor' ? 'bg-purple-100 text-purple-700' :
+                              teacher.designation === 'Assistant Professor' ? 'bg-blue-100 text-blue-700' :
+                              teacher.designation === 'Lecturer' ? 'bg-emerald-100 text-emerald-700' :
+                              teacher.designation === 'Lab Instructor' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-500'
+                            }`}>
+                              {teacher.designation || 'N/A'}
+                            </span>
+                          </td>
                           <td className={td}>
                             <Badge tone="indigo">{deptName(teacher.deptId)}</Badge>
                           </td>
