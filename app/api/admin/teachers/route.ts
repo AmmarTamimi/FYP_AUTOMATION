@@ -24,11 +24,11 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const groupId = url.searchParams.get('groupId');
+    
     if(!groupId){
-
-      const teachers = await executeQuery("SELECT * FROM teachers");
-      console.log(teachers);
-      
+      const teachers = await executeQuery(
+        `SELECT * FROM teachers WHERE STATUS = 'ACTIVE'`
+      );
       return NextResponse.json(teachers);
     }
 
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
     const {
       name,
       email,
+      password: userPassword,
       department,
       specialization,
       qualification,
@@ -140,8 +141,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ Generate password
-    const password = `${name.replace(/\s/g, "")}_123`;
+    // ✅ Generate password if not provided
+    let finalPassword = userPassword
+    if (!finalPassword || finalPassword.length < 6) {
+      // Generate a secure password if not provided or too short
+      finalPassword = Math.random().toString(36).slice(-8);
+      console.log(`⚠️ Generated password for ${email}: ${finalPassword}`);
+    }
 
     // ✅ Add teacher with auto-determined role
     const result = await executeQuery(
@@ -152,7 +158,7 @@ export async function POST(req: NextRequest) {
         email,
         email,
         name,
-        password,
+        finalPassword,
         specialization,
         qualification,
         experienceNum,
@@ -168,7 +174,7 @@ export async function POST(req: NextRequest) {
       email,
       name,
       email,
-      password,
+      finalPassword,
       autoRole,
     );
 
@@ -193,7 +199,7 @@ export async function POST(req: NextRequest) {
         credentials: {
           email: email,
           username: email,
-          password: password,
+          password: finalPassword,
         },
       },
       { status: 201 },

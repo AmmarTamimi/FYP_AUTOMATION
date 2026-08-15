@@ -1,3 +1,4 @@
+// app/api/auth/login/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import { executeQuery } from "@/app/lib/db.server";
 
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
         console.log("Login attempt:", { email, role });
 
         // ============================================
-        // admin LOGIN - Use lowercase 'admin'
+        // ADMIN LOGIN
         // ============================================
         if (role === 'ADMIN') {
             const adminResult = await executeQuery(
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
             
             if ((adminResult as any[]).length === 0) {
                 return NextResponse.json(
-                    { message: 'admin not found' },
+                    { message: 'Admin not found' },
                     { status: 401 }
                 );
             }
@@ -47,11 +48,12 @@ export async function POST(req: NextRequest) {
         }
         
         // ============================================
-        // TEACHER LOGIN - Use lowercase 'teachers'
+        // TEACHER LOGIN - WITH STATUS CHECK
         // ============================================
         if (role === 'TEACHER') {
             const teacherResult = await executeQuery(
-                'SELECT TeacherId as id, name, email, password FROM teachers WHERE email = ?',
+                `SELECT TeacherId as id, name, email, password, status 
+                 FROM teachers WHERE email = ?`,
                 [email]
             );
             
@@ -63,6 +65,14 @@ export async function POST(req: NextRequest) {
             }
             
             const teacher = (teacherResult as any[])[0];
+            
+            // ✅ Check if teacher is approved
+            if (teacher.status !== 'VERIFIED' && teacher.status !== 'ACTIVE') {
+                return NextResponse.json(
+                    { message: 'Your account is pending admin approval. Please wait for verification.' },
+                    { status: 403 }
+                );
+            }
             
             if (teacher.password !== password) {
                 return NextResponse.json(
@@ -83,7 +93,7 @@ export async function POST(req: NextRequest) {
         }
         
         // ============================================
-        // STUDENT GROUP LOGIN - Use lowercase 'studentgroup'
+        // STUDENT GROUP LOGIN
         // ============================================
         if (role === 'STUDENT') {
             const groupResult = await executeQuery(
@@ -107,7 +117,6 @@ export async function POST(req: NextRequest) {
                 );
             }
             
-            // Get all members of the group
             const membersResult = await executeQuery(
                 'SELECT stdId as id, name, email, section FROM students WHERE groupId = ?',
                 [group.id]
