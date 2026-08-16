@@ -18,13 +18,13 @@ export default function HomePage() {
       // Now TypeScript knows about session.user.role
       switch (session.user?.role) {
         case 'ADMIN':
-          router.push('dashboard/admin');
+          router.push('/admin/dashboard');
           break;
         case 'TEACHER':
-          router.push('/dashboard/teacher');
+          router.push('/teacher/dashboard');
           break;
         case 'STUDENT':
-          router.push('/dashboard/student');
+          router.push('/student/dashboard');
           break;
         default:
           router.push('/login');

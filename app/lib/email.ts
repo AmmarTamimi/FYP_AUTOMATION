@@ -470,7 +470,7 @@ export async function sendAdminPasswordChangedEmail(
             </div>
             
             <div style="text-align: center;">
-              <a href="https://fyp-automation-fast.vercel.app/admin/login" class="button">🚀 Login to Admin Dashboard</a>
+              <a href="https://fyp-automation-fast.vercel.app/login" class="button">🚀 Login to Admin Dashboard</a>
             </div>
             
             <div class="message-box warning">
@@ -557,9 +557,634 @@ export async function sendAdminPasswordChangedEmail(
       recipient: adminEmail,
       admin: adminName
     };
+
   }
 }
 
+// Add to your lib/email.ts
+
+export async function sendTeacherRegistrationNotification(
+  adminEmail: string,
+  adminName: string,
+  teacherData: {
+    name: string;
+    email: string;
+    department?: string;
+    role: 'senior' | 'junior';
+    registrationDate: Date;
+  }
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending teacher registration notification to admin: ${adminEmail}`);
+
+    // Validate inputs
+    if (!adminEmail || !adminName || !teacherData.name || !teacherData.email) {
+      console.error(`❌ [EMAIL] Missing required fields for teacher registration notification`);
+      return { 
+        success: false, 
+        error: 'Missing required fields' 
+      };
+    }
+
+    const roleTitle = teacherData.role === 'senior' ? 'Senior Evaluator' : 'Junior Evaluator';
+    const formattedDate = new Date(teacherData.registrationDate).toLocaleString('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'medium'
+    });
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Teacher Registration Notification</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+          }
+          .content {
+            padding: 30px;
+            background: #ffffff;
+          }
+          .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+          }
+          .message-box {
+            background: #f0f4ff;
+            border-left: 4px solid #3F51B5;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+          }
+          .info-box {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .info-item {
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+          }
+          .info-item:last-child {
+            border-bottom: none;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #3F51B5;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .info-value {
+            font-size: 16px;
+            color: #1A237E;
+            margin-top: 4px;
+          }
+          .button {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 20px 0;
+            font-weight: bold;
+          }
+          .button:hover {
+            opacity: 0.9;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+          }
+          .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+          }
+          .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+          }
+          .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+          }
+          .badge-senior {
+            background: #1A237E;
+            color: white;
+          }
+          .badge-junior {
+            background: #4CAF50;
+            color: white;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="icon">👨‍🏫</div>
+            <h1>FYP Automation System</h1>
+            <p>New Teacher Registration</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              <strong>Dear ${adminName},</strong>
+            </div>
+            
+            <p>A new teacher has registered in the FYP Automation System and requires your approval.</p>
+            
+            <div class="message-box">
+              <p>📢 <strong>New Registration Alert!</strong> A teacher has created an account and is waiting for administrative approval.</p>
+            </div>
+            
+            <div class="info-box">
+              <h3 style="color: #1A237E; margin-top: 0;">Teacher Details</h3>
+              <div class="info-item">
+                <div class="info-label">👤 Name</div>
+                <div class="info-value">${teacherData.name}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">📧 Email</div>
+                <div class="info-value">${teacherData.email}</div>
+              </div>
+              ${teacherData.department ? `
+              <div class="info-item">
+                <div class="info-label">🏛️ Department</div>
+                <div class="info-value">${teacherData.department}</div>
+              </div>
+              ` : ''}
+              <div class="info-item">
+                <div class="info-label">🎯 Role</div>
+                <div class="info-value">
+                  <span class="badge ${teacherData.role === 'senior' ? 'badge-senior' : 'badge-junior'}">
+                    ${roleTitle}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">📅 Registration Date</div>
+                <div class="info-value">${formattedDate}</div>
+              </div>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="https://fyp-automation-fast.vercel.app/admin/teachers/pending" class="button">👀 Review Registration</a>
+            </div>
+            
+            <div class="message-box warning">
+              <p>⚠️ <strong>Action Required:</strong> Please review this teacher's registration and approve or reject it.</p>
+              <p style="font-size: 14px; margin-top: 10px;">💡 Approved teachers will be able to evaluate Final Year Projects and be assigned to juries.</p>
+            </div>
+            
+            <div class="info-text">
+              <p>As an administrator, you have the authority to approve or reject teacher registrations.</p>
+              <p>You will receive another notification once the teacher is approved and credentials are generated.</p>
+            </div>
+            
+            <p>Best regards,<br>
+            <strong>FYP Automation Team</strong><br>
+            <span style="font-size: 12px; color: #666;">Final Year Project Management System</span></p>
+          </div>
+          
+          <div class="footer">
+            <p>© 2025 FYP Automation System | This is an automated message, please do not reply.</p>
+            <p>Sent from the FYP Automation System</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      FYP Automation System - New Teacher Registration
+      ================================================
+      
+      Dear ${adminName},
+      
+      A new teacher has registered in the FYP Automation System and requires your approval.
+      
+      TEACHER DETAILS:
+      ----------------
+      Name: ${teacherData.name}
+      Email: ${teacherData.email}
+      ${teacherData.department ? `Department: ${teacherData.department}` : ''}
+      Role: ${roleTitle}
+      Registration Date: ${formattedDate}
+      
+      Action Required: Please review this teacher's registration and approve or reject it.
+      
+      Review URL: https://fyp-automation-fast.vercel.app/admin/teachers/pending
+      
+      Approved teachers will be able to evaluate Final Year Projects and be assigned to juries.
+      
+      Best regards,
+      FYP Automation Team
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: adminEmail,
+      subject: `👨‍🏫 New Teacher Registration - Action Required`,
+      html: htmlContent,
+      text: textContent,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high'
+      }
+    });
+
+    console.log(`✅ [EMAIL] Teacher registration notification sent to admin ${adminEmail}`);
+    console.log(`✅ [EMAIL] Message ID: ${info.messageId}`);
+    console.log(`✅ [EMAIL] Sent at: ${new Date().toISOString()}`);
+    
+    return { 
+      success: true, 
+      messageId: info.messageId,
+      recipient: adminEmail,
+      admin: adminName,
+      sentAt: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send teacher registration notification to admin ${adminEmail}`);
+    console.error(`❌ [EMAIL] Error details:`, error);
+    
+    if (error instanceof Error) {
+      console.error(`❌ [EMAIL] Error name: ${error.name}`);
+      console.error(`❌ [EMAIL] Error message: ${error.message}`);
+    }
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown email error',
+      recipient: adminEmail
+    };
+  }
+}
+
+// Add to your lib/email.ts
+
+export async function sendGroupRegistrationNotification(
+  adminEmail: string,
+  adminName: string,
+  groupData: {
+    groupName: string;
+    projectTitle: string;
+    members: Array<{ name: string; email: string; rollNo?: string }>;
+    supervisor?: string;
+    registrationDate: Date;
+  }
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending group registration notification to admin: ${adminEmail}`);
+
+    // Validate inputs
+    if (!adminEmail || !adminName || !groupData.groupName || !groupData.members || groupData.members.length === 0) {
+      console.error(`❌ [EMAIL] Missing required fields for group registration notification`);
+      return { 
+        success: false, 
+        error: 'Missing required fields' 
+      };
+    }
+
+    const formattedDate = new Date(groupData.registrationDate).toLocaleString('en-US', {
+      dateStyle: 'full',
+      timeStyle: 'medium'
+    });
+
+    const membersList = groupData.members.map((member, index) => 
+      `${index + 1}. ${member.name} (${member.email})${member.rollNo ? ` - ${member.rollNo}` : ''}`
+    ).join('\n');
+
+    const membersHtml = groupData.members.map((member, index) => `
+      <div class="info-item">
+        <div class="info-label">Student ${index + 1}</div>
+        <div class="info-value">
+          <strong>${member.name}</strong><br>
+          ${member.email}${member.rollNo ? `<br>Roll No: ${member.rollNo}` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Group Registration Notification</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+          }
+          .content {
+            padding: 30px;
+            background: #ffffff;
+          }
+          .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+          }
+          .message-box {
+            background: #f0f4ff;
+            border-left: 4px solid #3F51B5;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+          }
+          .info-box {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .info-item {
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+          }
+          .info-item:last-child {
+            border-bottom: none;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #3F51B5;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .info-value {
+            font-size: 16px;
+            color: #1A237E;
+            margin-top: 4px;
+          }
+          .button {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 20px 0;
+            font-weight: bold;
+          }
+          .button:hover {
+            opacity: 0.9;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+          }
+          .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+          }
+          .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+          }
+          .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: #4CAF50;
+            color: white;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="icon">👥</div>
+            <h1>FYP Automation System</h1>
+            <p>New Group Registration</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              <strong>Dear ${adminName},</strong>
+            </div>
+            
+            <p>A new student group has registered in the FYP Automation System and requires your approval.</p>
+            
+            <div class="message-box">
+              <p>📢 <strong>New Group Registration Alert!</strong> A student group has submitted their project proposal and is waiting for administrative approval.</p>
+            </div>
+            
+            <div class="info-box">
+              <h3 style="color: #1A237E; margin-top: 0;">Group Details</h3>
+              <div class="info-item">
+                <div class="info-label">👥 Group Name</div>
+                <div class="info-value"><strong>${groupData.groupName}</strong></div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">📝 Project Title</div>
+                <div class="info-value">${groupData.projectTitle || 'Not specified'}</div>
+              </div>
+              ${groupData.supervisor ? `
+              <div class="info-item">
+                <div class="info-label">👨‍🏫 Supervisor</div>
+                <div class="info-value">${groupData.supervisor}</div>
+              </div>
+              ` : ''}
+              <div class="info-item">
+                <div class="info-label">📅 Registration Date</div>
+                <div class="info-value">${formattedDate}</div>
+              </div>
+            </div>
+            
+            <div class="info-box">
+              <h3 style="color: #1A237E; margin-top: 0;">Group Members</h3>
+              ${membersHtml}
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="https://fyp-automation-fast.vercel.app/admin/groups/pending" class="button">👀 Review Group</a>
+            </div>
+            
+            <div class="message-box warning">
+              <p>⚠️ <strong>Action Required:</strong> Please review this group's registration and approve or reject it.</p>
+              <p style="font-size: 14px; margin-top: 10px;">💡 Approved groups will be able to submit their Final Year Project proposals and participate in evaluations.</p>
+            </div>
+            
+            <div class="info-text">
+              <p>As an administrator, you have the authority to approve or reject group registrations.</p>
+              <p>You will receive another notification once the group is approved and assigned to a jury.</p>
+            </div>
+            
+            <p>Best regards,<br>
+            <strong>FYP Automation Team</strong><br>
+            <span style="font-size: 12px; color: #666;">Final Year Project Management System</span></p>
+          </div>
+          
+          <div class="footer">
+            <p>© 2025 FYP Automation System | This is an automated message, please do not reply.</p>
+            <p>Sent from the FYP Automation System</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      FYP Automation System - New Group Registration
+      ==============================================
+      
+      Dear ${adminName},
+      
+      A new student group has registered in the FYP Automation System and requires your approval.
+      
+      GROUP DETAILS:
+      --------------
+      Group Name: ${groupData.groupName}
+      Project Title: ${groupData.projectTitle || 'Not specified'}
+      ${groupData.supervisor ? `Supervisor: ${groupData.supervisor}` : ''}
+      Registration Date: ${formattedDate}
+      
+      GROUP MEMBERS:
+      --------------
+      ${membersList}
+      
+      Action Required: Please review this group's registration and approve or reject it.
+      
+      Review URL: https://fyp-automation-fast.vercel.app/admin/groups/pending
+      
+      Approved groups will be able to submit their Final Year Project proposals and participate in evaluations.
+      
+      Best regards,
+      FYP Automation Team
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: adminEmail,
+      subject: `👥 New Group Registration - Action Required`,
+      html: htmlContent,
+      text: textContent,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high'
+      }
+    });
+
+    console.log(`✅ [EMAIL] Group registration notification sent to admin ${adminEmail}`);
+    console.log(`✅ [EMAIL] Message ID: ${info.messageId}`);
+    console.log(`✅ [EMAIL] Sent at: ${new Date().toISOString()}`);
+    
+    return { 
+      success: true, 
+      messageId: info.messageId,
+      recipient: adminEmail,
+      admin: adminName,
+      sentAt: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send group registration notification to admin ${adminEmail}`);
+    console.error(`❌ [EMAIL] Error details:`, error);
+    
+    if (error instanceof Error) {
+      console.error(`❌ [EMAIL] Error name: ${error.name}`);
+      console.error(`❌ [EMAIL] Error message: ${error.message}`);
+    }
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown email error',
+      recipient: adminEmail
+    };
+  }
+}
 // lib/email.ts - Add this function
 
 export async function sendGroupRejectionEmail(leaderEmail: string, groupUsername: string, reason?: string) {

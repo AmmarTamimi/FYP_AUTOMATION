@@ -211,7 +211,7 @@ export default function RegisterPage() {
       if(response.ok){
         setSubmitted(true);
       }else{
-        setError("Registration failed");
+        setError("Registration failed " + data.message);
       }
     } catch (error) {
       console.log("Submit data error: ",error);

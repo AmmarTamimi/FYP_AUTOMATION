@@ -1,7 +1,7 @@
 // app/(dashboard)/admin/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -101,7 +101,8 @@ type TabType =
   | "departments"
   | "teachers"
   | "profile"
-  | "settings";
+  | "settings"
+  | "pendingTeachers";
 
 /* ============================================================
    SHARED UI PRIMITIVES  (module scope = no remount on re-render)
@@ -203,6 +204,7 @@ const EmptyState = ({
     <p className="text-sm text-slate-500 mt-1 max-w-sm">{message}</p>
   </div>
 );
+
 
 /* ---------- Modal shell ---------- */
 const ModalShell = ({
@@ -680,6 +682,8 @@ const SettingsTab = () => {
     );
   }
 
+
+
   return (
     <div className="space-y-5">
       {success && (
@@ -910,6 +914,158 @@ const SettingsTab = () => {
   );
 };
 
+  /* ============================================================
+   PENDING TEACHERS TAB
+   ============================================================ */
+// Update the component to accept props
+
+const PendingTeachersTab = ({ 
+  pendingTeachers, 
+  setPendingTeachers,
+  setTeachers,
+  refreshPendingTeachers 
+}: { 
+  pendingTeachers: Teacher[];
+  setPendingTeachers: React.Dispatch<React.SetStateAction<Teacher[]>>;
+  setTeachers: React.Dispatch<React.SetStateAction<Teacher[]>>;
+  refreshPendingTeachers: () => Promise<void>;
+}) => {
+  const handleApproveTeacher = async (teacherId: number) => {
+    if (!confirm('Are you sure you want to approve this teacher?')) return;
+    
+    try {
+      const response = await fetch('/api/admin/approve-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherId }),
+      });
+
+      if (response.ok) {
+        alert('Teacher approved successfully! Credentials sent via email.');
+        await refreshPendingTeachers();
+        
+        // Refresh teachers list as well
+        const teacherRes = await fetch("/api/admin/teachers");
+        const teacherData = await teacherRes.json();
+        setTeachers(teacherData);
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to approve teacher');
+      }
+    } catch (error) {
+      console.error('Error approving teacher:', error);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  const handleRejectTeacher = async (teacherId: number) => {
+    const reason = prompt('Please enter the reason for rejection:');
+    if (reason === null) return;
+    
+    if (!reason.trim()) {
+      alert('Please provide a reason for rejection.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/reject-teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherId, reason: reason.trim() }),
+      });
+
+      if (response.ok) {
+        alert('Teacher rejected successfully. Notification email sent.');
+        await refreshPendingTeachers();
+        
+        // Refresh teachers list as well
+        const teacherRes = await fetch("/api/admin/teachers");
+        const teacherData = await teacherRes.json();
+        setTeachers(teacherData);
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to reject teacher');
+      }
+    } catch (error) {
+      console.error('Error rejecting teacher:', error);
+      alert('Network error. Please try again.');
+    }
+  };
+
+  return (
+    <Card>
+      <SectionHeader
+        title="Pending Teacher Registrations"
+        subtitle={`${pendingTeachers.length} teacher(s) awaiting approval`}
+        icon={UserCheck}
+      />
+      {pendingTeachers.length === 0 ? (
+        <EmptyState
+          icon={CheckCircle}
+          title="No pending teachers"
+          message="All teacher registrations have been reviewed."
+        />
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {pendingTeachers.map((teacher) => (
+            <li
+              key={teacher.TeacherId}
+              className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors"
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <User className="w-[18px] h-[18px]" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {teacher.name}
+                    </p>
+                    <Badge tone="amber">Pending</Badge>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 truncate">
+                    Email: {teacher.email}
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-xs text-slate-400">
+                      Designation: {teacher.designation || 'N/A'}
+                    </span>
+                    <span className="text-xs text-slate-300">•</span>
+                    <span className="text-xs text-slate-400">
+                      Dept: {teacher.deptId || 'N/A'}
+                    </span>
+                    <span className="text-xs text-slate-300">•</span>
+                    <span className="text-xs text-slate-400">
+                      Specialization: {teacher.specialization || 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <button
+                  onClick={() => handleApproveTeacher(teacher.TeacherId)}
+                  className={btnGreen}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve
+                </button>
+                <button
+                  onClick={() => handleRejectTeacher(teacher.TeacherId)}
+                  className={btnRose}
+                >
+                  <XCircle className="w-4 h-4" />
+                  Reject
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+};
+
 /* ============================================================
    MAIN DASHBOARD
    ============================================================ */
@@ -927,9 +1083,28 @@ export default function AdminDashboard() {
   // Data states
   const [pendingGroups, setPendingGroups] = useState<StudentGroup[]>([]);
   const [verifiedGroups, setVerifiedGroups] = useState<StudentGroup[]>([]);
+  //
+  const [pendingTeachers, setPendingTeachers] = useState<Teacher[]>([]);
+  
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+
+
+  // Add this function in the parent scope
+const refreshPendingTeachers = useCallback(async () => {
+  try {
+    const response = await fetch('/api/admin/pending-teachers');
+    if (!response.ok) throw new Error('Failed to fetch pending teachers');
+    const data = await response.json();
+    setPendingTeachers(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error('Error fetching pending teachers:', error);
+    setPendingTeachers([]);
+  }
+  }, []);
+  //////////////////////////////////
+
 
   // Modal states
   const [showGroupModal, setShowGroupModal] = useState<{
@@ -977,47 +1152,60 @@ const [selectedGroupForJury, setSelectedGroupForJury] = useState<{ groupId: numb
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  ///////
+  const fetchPendingTeachers = async () => {
+    try {
+      const response = await fetch('/api/admin/pending-teachers');
+      const data = await response.json();
+      setPendingTeachers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching pending teachers:', error);
+      setPendingTeachers([]);
+    }
+  };
+
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       const pendingRes = await fetch("/api/admin/groups?status=PENDING");
       const pendingData = await pendingRes.json();
       setPendingGroups(pendingData);
-
+  
       const verifiedRes = await fetch("/api/admin/groups?status=VERIFIED");
       const verifiedData = await verifiedRes.json();
       setVerifiedGroups(verifiedData);
-
+  
       const deptRes = await fetch("/api/admin/departments");
       const deptData = await deptRes.json();
       setDepartments(deptData);
     
-
+      //
+      await refreshPendingTeachers();
       const teacherRes = await fetch("/api/admin/teachers");
       const teacherData = await teacherRes.json();
       setTeachers(teacherData);
-
+  
       const studentRes = await fetch("/api/admin/students");
       let studentData = await studentRes.json();
-
+  
       if (Array.isArray(studentData)) {
         studentData = studentData.map((student: any) => {
           const email = student?.email || "";
           let rollNumber = "";
-
+  
           if (email && typeof email === "string") {
             const match = email.match(/k(\d{2})(\d{4})@/);
             if (match) {
               rollNumber = `${match[1]}k-${match[2]}`;
             }
           }
-
+  
           return { ...student, rollNum: rollNumber };
         });
       }
-
+  
       setStudents(studentData);
-
+  
       setStats({
         totalStudents: Array.isArray(studentData) ? studentData.length : 0,
         totalTeachers: Array.isArray(teacherData) ? teacherData.length : 0,
@@ -1029,7 +1217,7 @@ const [selectedGroupForJury, setSelectedGroupForJury] = useState<{ groupId: numb
     } finally {
       setLoading(false);
     }
-  };
+  }, [refreshPendingTeachers]); // ✅ Add dependency
 
   /* ---------------- Handlers (unchanged logic) ---------------- */
 
@@ -1173,6 +1361,8 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
     localStorage.removeItem("user");
     router.push("/login");
   };
+
+
 
   const handleAddTeacher = async (teacherData: any) => {
     try {
@@ -1328,6 +1518,7 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
     { key: "students", label: "Students", icon: GraduationCap },
     { key: "departments", label: "Departments", icon: Building2 },
     { key: "teachers", label: "Teachers", icon: Users },
+    { key: "pendingTeachers", label: "Pending Teachers", icon: UserCheck, badge: pendingTeachers.length }, // 
     { key: "profile", label: "Profile", icon: User },
     { key: "settings", label: "Settings", icon: Settings },
   ];
@@ -1338,6 +1529,7 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
     students: "Students",
     departments: "Departments",
     teachers: "Teachers",
+    pendingTeachers: "Pending Teacher Registrations", //
     profile: "Profile",
     settings: "Settings",
   };
@@ -1348,6 +1540,7 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
     students: "All registered students in the portal",
     departments: "Academic departments used across the portal",
     teachers: "Faculty available for jury assignment",
+    pendingTeachers: "Review and approve pending teacher registrations", //
     profile: "Your administrator account overview",
     settings: "Security and preference settings",
   };
@@ -1700,6 +1893,9 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
                         </div>
                       </div>
 
+                      
+
+
                       <div className="flex flex-wrap gap-2 shrink-0">
                         <button onClick={() => handleViewGroup(group)} className={btnGhost}>
                           <Eye className="w-4 h-4" />
@@ -1867,9 +2063,8 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
                           <td className={`${td} text-slate-400`}>{teacher.TeacherId}</td>
                           <td className={`${td} font-medium text-slate-900`}>{teacher.name}</td>
                           <td className={`${td} text-slate-500`}>{teacher.email}</td>
-                          <td className={td}>
-                            {/* ✅ ADD THIS - Designation with color coding */}
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          <td className={`${td} whitespace-nowrap`}>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium inline-block ${
                               teacher.designation === 'Professor' ? 'bg-purple-100 text-purple-700' :
                               teacher.designation === 'Assistant Professor' ? 'bg-blue-100 text-blue-700' :
                               teacher.designation === 'Lecturer' ? 'bg-emerald-100 text-emerald-700' :
@@ -1890,6 +2085,16 @@ const handleAssignJury = async (groupId: number, seniorId: number, juniorId: num
                 </div>
               )}
             </Card>
+          )}
+
+
+          {activeTab === "pendingTeachers" && (
+            <PendingTeachersTab 
+              pendingTeachers={pendingTeachers}
+              setPendingTeachers={setPendingTeachers}
+              setTeachers={setTeachers}
+              refreshPendingTeachers={refreshPendingTeachers}
+            />
           )}
 
           {/* ============ PROFILE / SETTINGS ============ */}
