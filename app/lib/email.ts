@@ -292,6 +292,274 @@ export async function sendVerificationEmail(recipientEmail: string, otpCode: str
   }
 }
 
+// Add to your lib/email.ts
+
+export async function sendAdminPasswordChangedEmail(
+  adminEmail: string,
+  adminName: string,
+  newPassword: string,
+  changedBy: 'admin' | 'system'
+) {
+  try {
+    console.log(`📧 [EMAIL] Sending admin password change email to: ${adminEmail}`);
+    console.log(`📧 [EMAIL] Admin: ${adminName}`);
+
+    // Validate inputs
+    if (!adminEmail || !adminName || !newPassword) {
+      console.error(`❌ [EMAIL] Missing required fields for admin password change`);
+      return { 
+        success: false, 
+        error: 'Missing recipient, admin name, or new password' 
+      };
+    }
+
+    const changedByText = changedBy === 'admin' ? 'you' : 'the system administrator';
+    const changedByIcon = changedBy === 'admin' ? '🔐' : '🔄';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Admin Password Updated</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+          }
+          .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          .header {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 10px 0 0;
+            opacity: 0.9;
+          }
+          .content {
+            padding: 30px;
+            background: #ffffff;
+          }
+          .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+          }
+          .message-box {
+            background: #f0f4ff;
+            border-left: 4px solid #3F51B5;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+          }
+          .credentials {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+          }
+          .credential-item {
+            margin: 15px 0;
+          }
+          .credential-label {
+            font-weight: bold;
+            color: #3F51B5;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .credential-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1A237E;
+            font-family: 'Courier New', monospace;
+            background: #e8eaf6;
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            margin-top: 8px;
+          }
+          .button {
+            background: linear-gradient(135deg, #1A237E 0%, #3F51B5 100%);
+            color: white;
+            text-decoration: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 20px 0;
+            font-weight: bold;
+          }
+          .button:hover {
+            opacity: 0.9;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #e0e0e0;
+          }
+          .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+          }
+          .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+          }
+          .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+          }
+          .success-box {
+            background: #d4edda;
+            border-left-color: #28a745;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="icon">${changedByIcon}</div>
+            <h1>FYP Automation System</h1>
+            <p>Admin Password Updated</p>
+          </div>
+          
+          <div class="content">
+            <div class="greeting">
+              <strong>Dear ${adminName},</strong>
+            </div>
+            
+            <p>Your administrator account password has been successfully updated.</p>
+            
+            <div class="message-box success-box">
+              <p>✅ <strong>Password updated successfully!</strong> The change was initiated by ${changedByText}.</p>
+            </div>
+            
+            <div class="credentials">
+              <div class="credential-item">
+                <div class="credential-label">🔑 ADMIN EMAIL</div>
+                <div class="credential-value">${adminEmail}</div>
+              </div>
+              <div class="credential-item">
+                <div class="credential-label">🔐 NEW PASSWORD</div>
+                <div class="credential-value">${newPassword}</div>
+              </div>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="https://fyp-automation-fast.vercel.app/admin/login" class="button">🚀 Login to Admin Dashboard</a>
+            </div>
+            
+            <div class="message-box warning">
+              <p>⚠️ <strong>Important:</strong> Please keep these credentials secure. Do not share them with anyone.</p>
+              <p style="font-size: 14px; margin-top: 10px;">💡 For security reasons, we recommend changing your password immediately after login if this was a system-generated password.</p>
+            </div>
+            
+            <p>If you did not request this password change, please contact the system administrator immediately.</p>
+            
+            <p>Best regards,<br>
+            <strong>FYP Automation Team</strong><br>
+            <span style="font-size: 12px; color: #666;">Final Year Project Management System</span></p>
+          </div>
+          
+          <div class="footer">
+            <p>© 2025 FYP Automation System | This is an automated message, please do not reply.</p>
+            <p>Sent from the FYP Automation System</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const textContent = `
+      FYP Automation System - Admin Password Updated
+      ==============================================
+      
+      Dear ${adminName},
+      
+      Your administrator account password has been successfully updated. The change was initiated by ${changedByText}.
+      
+      NEW LOGIN CREDENTIALS:
+      ----------------------
+      Admin Email: ${adminEmail}
+      New Password: ${newPassword}
+      
+      Login URL: https://fyp-automation-fast.vercel.app/admin/login
+      
+      Important: Please keep these credentials secure. For security reasons, we recommend changing your password immediately after login if this was a system-generated password.
+      
+      If you did not request this password change, please contact the system administrator immediately.
+      
+      Best regards,
+      FYP Automation Team
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"FYP Automation System" <ammarmazher10@gmail.com>`,
+      to: adminEmail,
+      subject: `🔐 Admin Password Updated - FYP Automation System`,
+      html: htmlContent,
+      text: textContent,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high'
+      }
+    });
+
+    console.log(`✅ [EMAIL] Admin password change email sent to ${adminEmail}`);
+    console.log(`✅ [EMAIL] Message ID: ${info.messageId}`);
+    console.log(`✅ [EMAIL] Sent at: ${new Date().toISOString()}`);
+    
+    return { 
+      success: true, 
+      messageId: info.messageId,
+      recipient: adminEmail,
+      admin: adminName,
+      sentAt: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error(`❌ [EMAIL] Failed to send admin password change email to ${adminEmail}`);
+    console.error(`❌ [EMAIL] Error details:`, error);
+    
+    if (error instanceof Error) {
+      console.error(`❌ [EMAIL] Error name: ${error.name}`);
+      console.error(`❌ [EMAIL] Error message: ${error.message}`);
+    }
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown email error',
+      recipient: adminEmail,
+      admin: adminName
+    };
+  }
+}
+
 // lib/email.ts - Add this function
 
 export async function sendGroupRejectionEmail(leaderEmail: string, groupUsername: string, reason?: string) {
